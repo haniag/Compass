@@ -182,7 +182,7 @@ swift run -c release --package-path PromptLab PromptLab
 
 Apple Intelligence features only run on a simulator when the Mac itself has Apple Intelligence enabled. Otherwise the fallback path is what you'll see.
 
-Not a git repository yet. Suggest `git init` before large changes so every step can be reviewed and undone.
+Git repository (branch `main`, no remote), started Oct 2026. `.gitignore` keeps out `DebugTestAccount.swift` and `data.txt` (both hold the test token), Xcode user data and build output. A fresh clone won't build until `DebugTestAccount.swift` is recreated locally. Commit after each working step so it can be reviewed and undone. Git commands that write to `.git` need to run outside the sandbox.
 
 
 - Don't add a Co-Authored-By line to commit messages.
