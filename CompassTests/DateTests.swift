@@ -123,3 +123,52 @@ struct DayRangeTests {
         #expect(TestDates.parts(range.lastDay) == (2026, 1, 2))
     }
 }
+
+struct PeriodTests {
+    private let now = TestDates.date(2026, 10, 7, 11, 0)
+
+    @Test func yesterdayAndTheDayBefore() {
+        let range = Fact.Period.yesterday.range(before: now, calendar: TestDates.utc)
+        #expect(TestDates.parts(range.firstDay) == (2026, 10, 6))
+        #expect(range.firstDay == range.lastDay)
+        let before = Fact.Period.yesterday.comparison(for: range, calendar: TestDates.utc)
+        #expect(TestDates.parts(before.firstDay) == (2026, 10, 5))
+        #expect(before.firstDay == before.lastDay)
+    }
+
+    @Test func lastMonthIsTheCalendarMonthBefore() {
+        let range = Fact.Period.lastMonth.range(before: now, calendar: TestDates.utc)
+        #expect(TestDates.parts(range.firstDay) == (2026, 9, 1))
+        #expect(TestDates.parts(range.lastDay) == (2026, 9, 30))
+        // Compared with all of August (31 days), not the 30 days before September 1.
+        let before = Fact.Period.lastMonth.comparison(for: range, calendar: TestDates.utc)
+        #expect(TestDates.parts(before.firstDay) == (2026, 8, 1))
+        #expect(TestDates.parts(before.lastDay) == (2026, 8, 31))
+    }
+
+    @Test func lastMonthInJanuaryIsDecember() {
+        let range = Fact.Period.lastMonth.range(before: TestDates.date(2026, 1, 31, 9), calendar: TestDates.utc)
+        #expect(TestDates.parts(range.firstDay) == (2025, 12, 1))
+        #expect(TestDates.parts(range.lastDay) == (2025, 12, 31))
+    }
+
+    @Test func februaryIsComparedWithJanuary() {
+        let range = Fact.Period.lastMonth.range(before: TestDates.date(2026, 3, 31, 9), calendar: TestDates.utc)
+        #expect(TestDates.parts(range.lastDay) == (2026, 2, 28))
+        let before = Fact.Period.lastMonth.comparison(for: range, calendar: TestDates.utc)
+        #expect(TestDates.parts(before.firstDay) == (2026, 1, 1))
+        #expect(TestDates.parts(before.lastDay) == (2026, 1, 31))
+    }
+
+    @Test func thirtyDaysMatchesEmail() {
+        let range = Fact.Period.lastThirtyDays.range(before: now, calendar: TestDates.utc)
+        #expect(range == DayRange.last(30, daysBefore: now, calendar: TestDates.utc))
+    }
+
+    @Test func supporterBaselineGoesBackOnePeriod() {
+        let utc = TestDates.utc
+        #expect(TestDates.parts(Fact.Period.yesterday.supporterBaselineDate(before: now, calendar: utc)) == (2026, 10, 6))
+        #expect(TestDates.parts(Fact.Period.lastSevenDays.supporterBaselineDate(before: now, calendar: utc)) == (2026, 9, 30))
+        #expect(TestDates.parts(Fact.Period.lastMonth.supporterBaselineDate(before: now, calendar: utc)) == (2026, 9, 7))
+    }
+}

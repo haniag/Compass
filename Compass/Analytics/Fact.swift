@@ -24,9 +24,19 @@ nonisolated struct Fact: Identifiable, Hashable, Sendable {
         case percent
     }
 
-    enum Period: String, Hashable, Sendable {
+    /// The time period Pulse shows, picked by the user. Days are complete days, so
+    /// today is never included.
+    enum Period: String, CaseIterable, Identifiable, Hashable, Sendable {
+        /// Yesterday vs the day before.
+        case yesterday
         /// Last 7 days vs the 7 days before.
         case lastSevenDays
+        /// Last 30 days vs the 30 days before.
+        case lastThirtyDays
+        /// Last calendar month vs the month before it (September vs August).
+        case lastMonth
+
+        var id: Self { self }
     }
 
     let metric: Metric

@@ -35,6 +35,21 @@ nonisolated struct DayRange: Hashable, Sendable {
         return DayRange(firstDay: first, lastDay: today)
     }
 
+    /// The calendar month before the one `now` is in: Sep 1 – 30 on any day in October.
+    static func lastMonth(before now: Date, calendar: Calendar = .current) -> DayRange {
+        month(containing: calendar.date(byAdding: .month, value: -1, to: now) ?? now, calendar: calendar)
+    }
+
+    /// The whole calendar month `date` falls in.
+    static func month(containing date: Date, calendar: Calendar = .current) -> DayRange {
+        guard let month = calendar.dateInterval(of: .month, for: date) else {
+            let day = calendar.startOfDay(for: date)
+            return DayRange(firstDay: day, lastDay: day)
+        }
+        let last = calendar.date(byAdding: .day, value: -1, to: month.end) ?? month.start
+        return DayRange(firstDay: month.start, lastDay: calendar.startOfDay(for: last))
+    }
+
     /// The start of each day in the range, oldest first.
     func days(calendar: Calendar = .current) -> [Date] {
         var days: [Date] = []
@@ -62,8 +77,16 @@ nonisolated struct DayRange: Hashable, Sendable {
         )
     }
 
-    /// "Sep 17 – 23"
+    /// The calendar month just before this range's first day: August for September.
+    func previousMonth(calendar: Calendar = .current) -> DayRange {
+        DayRange.month(containing: calendar.date(byAdding: .day, value: -1, to: firstDay) ?? firstDay, calendar: calendar)
+    }
+
+    /// "Sep 17 – 23", or "Oct 6" for a single day.
     var label: String {
-        (firstDay..<lastDay).formatted(Date.IntervalFormatStyle().month(.abbreviated).day())
+        if firstDay == lastDay {
+            return firstDay.formatted(.dateTime.month(.abbreviated).day())
+        }
+        return (firstDay..<lastDay).formatted(Date.IntervalFormatStyle().month(.abbreviated).day())
     }
 }
