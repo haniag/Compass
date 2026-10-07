@@ -107,6 +107,16 @@ struct DayRangeTests {
         #expect(!range.contains(TestDates.date(2026, 9, 6, 23, 59), calendar: TestDates.utc))
     }
 
+    @Test func lastFourteenDaysIncludeToday() {
+        let range = DayRange.last(14, throughToday: TestDates.date(2026, 10, 7, 11, 0), calendar: TestDates.utc)
+        #expect(TestDates.parts(range.firstDay) == (2026, 9, 24))
+        #expect(TestDates.parts(range.lastDay) == (2026, 10, 7))
+        let days = range.days(calendar: TestDates.utc)
+        #expect(days.count == 14)
+        #expect(days.first == range.firstDay)
+        #expect(days.last == range.lastDay)
+    }
+
     @Test func crossesMonthAndYearBoundaries() {
         let range = DayRange.lastSevenDays(before: TestDates.date(2026, 1, 3, 9), calendar: TestDates.utc)
         #expect(TestDates.parts(range.firstDay) == (2025, 12, 27))

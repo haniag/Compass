@@ -186,8 +186,9 @@ nonisolated enum ENDemoData {
     ]
 
     /// Windows ending yesterday or today get the page's usual daily numbers; earlier
-    /// windows get 10% less, so changes show. A start over a year back means "the
-    /// whole campaign" and gets the totals.
+    /// windows get 10% less, so changes show. Single days vary between half and one and
+    /// a half times the usual, so the daily chart has a shape. A start over a year back
+    /// means "the whole campaign" and gets the totals.
     private static func pageGiving(_ parameters: [String: String]) -> Data {
         guard let page = demoPages[parameters["pageid"] ?? ""],
               let start = parameters["startDate"].flatMap(ENDateFormat.iso),
@@ -203,10 +204,14 @@ nonisolated enum ENDemoData {
         } else {
             let days = Int((end.timeIntervalSince(start) / 86_400).rounded()) + 1
             let isRecent = Date.now.timeIntervalSince(end) < 3 * 86_400
-            let share: Decimal = isRecent ? 1 : Decimal(string: "0.9")!
+            var share: Decimal = isRecent ? 1 : Decimal(string: "0.9")!
+            if days == 1 {
+                let dayOfYear = Calendar(identifier: .gregorian).ordinality(of: .day, in: .year, for: start) ?? 1
+                share = Decimal(50 + dayOfYear * 37 % 100) / 100
+            }
             single = page.singlePerDay * Decimal(days) * share
             recurring = page.recurringPerDay * Decimal(days) * share
-            singleGifts = Int((Double(page.singleGiftsPerDay * days) * (isRecent ? 1 : 0.9)).rounded())
+            singleGifts = Int((Double(page.singleGiftsPerDay * days) * NSDecimalNumber(decimal: share).doubleValue).rounded())
             recurringGifts = page.recurringGiftsPerDay * days
         }
         func money(_ amount: Decimal) -> String { NSDecimalNumber(decimal: amount).stringValue }

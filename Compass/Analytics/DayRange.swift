@@ -27,6 +27,26 @@ nonisolated struct DayRange: Hashable, Sendable {
         return DayRange(firstDay: first, lastDay: last)
     }
 
+    /// The `count` days ending today, today included (Giving's daily chart shows today's
+    /// total so far).
+    static func last(_ count: Int, throughToday now: Date, calendar: Calendar = .current) -> DayRange {
+        let today = calendar.startOfDay(for: now)
+        let first = calendar.date(byAdding: .day, value: -(count - 1), to: today) ?? today
+        return DayRange(firstDay: first, lastDay: today)
+    }
+
+    /// The start of each day in the range, oldest first.
+    func days(calendar: Calendar = .current) -> [Date] {
+        var days: [Date] = []
+        var day = firstDay
+        while day <= lastDay {
+            days.append(day)
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return days
+    }
+
     /// True when `date` falls on one of the days in the range.
     func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
         let end = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay

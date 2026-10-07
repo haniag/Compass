@@ -48,6 +48,20 @@ nonisolated enum GivingStats {
         }
     }
 
+    /// One bar of the daily-total chart: what a page raised on one day, in the reporting currency.
+    struct DailyTotal: Hashable, Sendable {
+        /// Start of the day, in the user's calendar.
+        let day: Date
+        let raised: Decimal
+    }
+
+    /// The day that raised the most (the earlier one on a tie). Nil when nothing was raised.
+    static func bestDay(_ days: [DailyTotal]) -> DailyTotal? {
+        days.reduce(nil as DailyTotal?) { best, day in
+            day.raised > (best?.raised ?? 0) ? day : best
+        }
+    }
+
     /// "▲ 8%" for raised against the window before. Nil when nothing came in before.
     static func change(_ current: Summary, from previous: Summary) -> FactChange? {
         FactChange.percent(from: previous.raised, to: current.raised, higherIsBetter: true)

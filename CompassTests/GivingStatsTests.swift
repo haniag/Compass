@@ -69,4 +69,19 @@ struct GivingStatsTests {
         #expect(change.isGood == true)
         #expect(GivingStats.change(now, from: GivingStats.Summary(nil, currency: "USD")) == nil)
     }
+
+    @Test func bestDayIsTheEarliestHighest() throws {
+        let days = [1_200, 3_900, 2_240, 3_900].enumerated().map { offset, amount in
+            GivingStats.DailyTotal(day: TestDates.date(2026, 9, 24 + offset), raised: Decimal(amount))
+        }
+        let best = try #require(GivingStats.bestDay(days))
+        #expect(TestDates.parts(best.day) == (2026, 9, 25))
+        #expect(best.raised == 3_900)
+    }
+
+    @Test func noBestDayWithoutGifts() {
+        let quiet = [GivingStats.DailyTotal(day: TestDates.date(2026, 9, 24), raised: 0)]
+        #expect(GivingStats.bestDay(quiet) == nil)
+        #expect(GivingStats.bestDay([]) == nil)
+    }
 }

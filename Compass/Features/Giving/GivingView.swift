@@ -5,6 +5,7 @@
 //  Giving tab: "how is this appeal doing, and who's giving?"
 //
 
+import Charts
 import SwiftData
 import SwiftUI
 
@@ -36,6 +37,9 @@ struct GivingView: View {
                     }
                     if let numbers = model.numbers {
                         raisedCard(numbers)
+                        if let days = model.dailyTotals {
+                            dailyCard(days)
+                        }
                         if numbers.current.raised > 0 {
                             splitCard(numbers.current)
                         }
@@ -165,6 +169,71 @@ struct GivingView: View {
         let gifts = summary.gifts == 1 ? "1 gift" : "\(summary.gifts.formatted()) gifts"
         guard let average = summary.averageGift else { return gifts }
         return "\(gifts) · average \(money(average))"
+    }
+
+    // MARK: Daily total
+
+    private func dailyCard(_ days: [GivingStats.DailyTotal]) -> some View {
+        let today = days.last
+        let best = GivingStats.bestDay(days)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Daily total")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text("Last \(GivingViewModel.chartDays) days")
+                    .font(.footnote)
+                    .foregroundStyle(Color.compassSecondaryText)
+            }
+            if best == nil {
+                Text("No gifts in the last \(GivingViewModel.chartDays) days")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.compassSecondaryText)
+            } else {
+                Chart(days, id: \.day) { day in
+                    BarMark(x: .value("Day", day.day, unit: .day),
+                            y: .value("Raised", NSDecimalNumber(decimal: day.raised).doubleValue))
+                        .foregroundStyle(day.day == today?.day ? Color.compassTeal : Color.compassTealLight)
+                        .cornerRadius(4)
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .frame(height: 96)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Daily totals for the last \(GivingViewModel.chartDays) days")
+                .accessibilityValue(dailySummary(days, best: best))
+                HStack {
+                    if let first = days.first {
+                        Text(first.day.formatted(.dateTime.month(.abbreviated).day()))
+                    }
+                    Spacer()
+                    if let today {
+                        Text("Today · \(money(today.raised))")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(Color.compassSecondaryText)
+                .accessibilityHidden(true)
+            }
+        }
+        .compassCard()
+    }
+
+    /// "Between $1,200 and $3,900 a day. Best day was Sep 19. Today so far: $2,240."
+    private func dailySummary(_ days: [GivingStats.DailyTotal], best: GivingStats.DailyTotal?) -> String {
+        let amounts = days.map(\.raised)
+        var parts: [String] = []
+        if let low = amounts.min(), let high = amounts.max() {
+            parts.append("Between \(money(low)) and \(money(high)) a day.")
+        }
+        if let best {
+            parts.append("Best day was \(best.day.formatted(.dateTime.month(.wide).day())).")
+        }
+        if let today = days.last {
+            parts.append("Today so far: \(money(today.raised)).")
+        }
+        return parts.joined(separator: " ")
     }
 
     // MARK: One-time and recurring
