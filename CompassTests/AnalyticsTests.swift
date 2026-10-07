@@ -122,7 +122,7 @@ struct PulseFactsTests {
     private let eur = ENDonationAmount(currency: "EUR", total: 99_000, average: 300)
 
     @Test func givingUsesTheReportingCurrencyOnly() throws {
-        let facts = PulseFacts.giving(current: [eur, usdNow], previous: [usdBefore], currency: "USD")
+        let facts = PulseFacts.giving(current: [eur, usdNow], previous: [usdBefore], currency: "USD", period: .lastSevenDays)
         let raised = try #require(facts.first { $0.metric == .raised })
         #expect(raised.value == 23_480)
         #expect(raised.baseline == 21_740)
@@ -134,7 +134,7 @@ struct PulseFactsTests {
     }
 
     @Test func noGiftsInTheCurrencyMeansZeroRaisedAndNoAverage() {
-        let facts = PulseFacts.giving(current: [eur], previous: [usdBefore], currency: "USD")
+        let facts = PulseFacts.giving(current: [eur], previous: [usdBefore], currency: "USD", period: .lastSevenDays)
         #expect(facts.count == 1)
         #expect(facts[0].metric == .raised)
         #expect(facts[0].value == 0)
@@ -142,7 +142,7 @@ struct PulseFactsTests {
     }
 
     @Test func averageGiftHasNoBaselineWhenNothingCameInBefore() throws {
-        let facts = PulseFacts.giving(current: [usdNow], previous: [], currency: "USD")
+        let facts = PulseFacts.giving(current: [usdNow], previous: [], currency: "USD", period: .lastSevenDays)
         let average = try #require(facts.first { $0.metric == .averageGift })
         #expect(average.baseline == nil)
     }
@@ -150,16 +150,16 @@ struct PulseFactsTests {
     @Test func openRateNeedsEmailsSent() {
         let none = ENBroadcastStats(emailsSent: 0, openRate: nil)
         let some = ENBroadcastStats(emailsSent: 100, openRate: Decimal(string: "38.2"))
-        #expect(PulseFacts.emailOpenRate(current: none, previous: some) == nil)
+        #expect(PulseFacts.emailOpenRate(current: none, previous: some, period: .lastSevenDays) == nil)
 
-        let fact = PulseFacts.emailOpenRate(current: some, previous: none)
+        let fact = PulseFacts.emailOpenRate(current: some, previous: none, period: .lastSevenDays)
         #expect(fact?.value == Decimal(string: "38.2"))
         #expect(fact?.baseline == nil)
         #expect(fact?.unit == .percent)
     }
 
     @Test func supportersWithoutHistoryHaveNoBaseline() {
-        #expect(PulseFacts.supporters(now: 500, weekAgo: nil).baseline == nil)
-        #expect(PulseFacts.supporters(now: 500, weekAgo: 480).baseline == 480)
+        #expect(PulseFacts.supporters(now: 500, before: nil, period: .lastSevenDays).baseline == nil)
+        #expect(PulseFacts.supporters(now: 500, before: 480, period: .lastSevenDays).baseline == 480)
     }
 }

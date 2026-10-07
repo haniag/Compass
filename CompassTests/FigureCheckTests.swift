@@ -69,4 +69,12 @@ struct FigureCheckTests {
         #expect(passes("20 people joined in the last 30 days.", thirty))
         #expect(!passes("20 people joined in the last 7 days.", thirty))
     }
+
+    @Test func monthWordsOnlyForLastMonth() {
+        let lastMonth = Fact(metric: .emailOpenRate, unit: .percent, value: Decimal(string: "85.7")!, baseline: 100, period: .lastMonth)
+        #expect(passes("Email opens fell to 85.7% last month, from 100.0% the month before.", lastMonth))
+        // The month the figures cover is over, so it's never "this month".
+        #expect(!passes("Email opens fell from 100.0% last month to 85.7% this month.", lastMonth))
+        #expect(!passes("New joins fell this month.", fact(.newJoins, 7, 10)))
+    }
 }

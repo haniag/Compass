@@ -171,4 +171,17 @@ struct PeriodTests {
         #expect(TestDates.parts(Fact.Period.lastSevenDays.supporterBaselineDate(before: now, calendar: utc)) == (2026, 9, 30))
         #expect(TestDates.parts(Fact.Period.lastMonth.supporterBaselineDate(before: now, calendar: utc)) == (2026, 9, 7))
     }
+
+    @Test func aWeekOldCountIsNotYesterdaysBaseline() {
+        let utc = TestDates.utc
+        let history = [SupporterTrend.Point(date: TestDates.date(2026, 9, 30, 9), count: 470),
+                       SupporterTrend.Point(date: now, count: 479)]
+        func baseline(_ period: Fact.Period) -> Int? {
+            SupporterTrend.count(atOrBefore: period.supporterBaselineDate(before: now, calendar: utc),
+                                 notBefore: period.supporterBaselineEarliest(before: now, calendar: utc),
+                                 in: history)
+        }
+        #expect(baseline(.yesterday) == nil)
+        #expect(baseline(.lastSevenDays) == 470)
+    }
 }

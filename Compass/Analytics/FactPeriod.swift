@@ -35,4 +35,17 @@ nonisolated extension Fact.Period {
         }
         return calendar.date(byAdding: back.0, value: back.1, to: now) ?? now
     }
+
+    /// The oldest saved supporter count that may stand in for the one at
+    /// `supporterBaselineDate`. Counts are saved only when the app refreshes, so the
+    /// right one may be missing; a much older one would overstate the change.
+    func supporterBaselineEarliest(before now: Date, calendar: Calendar = .current) -> Date {
+        let slack = switch self {
+        case .yesterday: 1
+        case .lastSevenDays: 3
+        case .lastThirtyDays, .lastMonth: 7
+        }
+        let target = supporterBaselineDate(before: now, calendar: calendar)
+        return calendar.date(byAdding: .day, value: -slack, to: target) ?? target
+    }
 }

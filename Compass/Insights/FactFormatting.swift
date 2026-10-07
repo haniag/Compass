@@ -130,10 +130,14 @@ nonisolated extension Fact.Period {
         }
     }
 
-    /// For AI instructions: "Never say "today", "yesterday" or "week"." Yesterday's figures
-    /// may say "yesterday"; FigureCheck enforces the same list.
+    /// For AI instructions: "Never say "today", "yesterday", "week" or "month"." FigureCheck
+    /// enforces the same words.
     var wordsToAvoid: String {
-        self == .yesterday ? "Never say \"today\" or \"week\"." : "Never say \"today\", \"yesterday\" or \"week\"."
+        switch self {
+        case .yesterday: "Never say \"today\", \"week\" or \"month\"."
+        case .lastSevenDays, .lastThirtyDays: "Never say \"today\", \"yesterday\", \"week\" or \"month\"."
+        case .lastMonth: "Never say \"today\", \"yesterday\", \"week\" or \"this month\"."
+        }
     }
 
     /// How Compass compares, for the "Why?" sheet.

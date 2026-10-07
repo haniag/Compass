@@ -61,7 +61,7 @@ struct InsightsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Digest · \(pulse.period.label)")
+            Text("\(pulse.shownPeriod.title) · \(pulse.period.label)")
                 .font(.subheadline)
                 .foregroundStyle(Color.compassSecondaryText)
             Text("Insights")

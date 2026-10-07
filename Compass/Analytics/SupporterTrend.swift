@@ -14,8 +14,12 @@ nonisolated enum SupporterTrend {
     }
 
     /// The newest count taken at or before `date`. `points` must be sorted oldest first.
-    static func count(atOrBefore date: Date, in points: [Point]) -> Int? {
-        points.last { $0.date <= date }?.count
+    /// With `notBefore`, a count taken earlier than that doesn't count: a count from last
+    /// week would make "change in the last day" a week's change.
+    static func count(atOrBefore date: Date, notBefore earliest: Date? = nil, in points: [Point]) -> Int? {
+        guard let point = points.last(where: { $0.date <= date }) else { return nil }
+        if let earliest, point.date < earliest { return nil }
+        return point.count
     }
 
     /// One point per week for up to `weeks` weeks back, ending with the newest count.

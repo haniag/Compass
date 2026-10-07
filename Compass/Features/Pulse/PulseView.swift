@@ -2,7 +2,7 @@
 //  PulseView.swift
 //  Compass
 //
-//  Home tab: "how have the last 7 days gone?"
+//  Home tab: "how did the last 7 days go?", or yesterday, the last 30 days, last month.
 //
 
 import Charts
@@ -10,7 +10,7 @@ import SwiftData
 import SwiftUI
 
 struct PulseView: View {
-    let model: PulseViewModel
+    @Bindable var model: PulseViewModel
     var onSeeAllInsights: () -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -21,6 +21,7 @@ struct PulseView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+                periodPicker
                 if model.refreshFailed {
                     refreshFailedBanner
                 }
@@ -60,6 +61,9 @@ struct PulseView: View {
         .refreshable { await model.refresh(in: modelContext) }
         .task { await model.refreshIfStale(in: modelContext) }
         .task(id: model.allFacts) { await model.writeBriefing() }
+        .onChange(of: model.selectedPeriod) {
+            Task { await model.refresh(in: modelContext) }
+        }
     }
 
     // MARK: Header
@@ -97,6 +101,19 @@ struct PulseView: View {
         .padding(.top, 8)
     }
 
+    /// Yesterday · Last 7 days · Last 30 days · Last month. Insights follows the same choice.
+    private var periodPicker: some View {
+        Picker("Time period", selection: $model.selectedPeriod) {
+            ForEach(Fact.Period.allCases) { period in
+                Text(period.title).tag(period)
+            }
+        }
+        .pickerStyle(.menu)
+        .tint(Color.compassTeal)
+        .fontWeight(.semibold)
+        .padding(.leading, -12)  // line the menu's text up with the cards
+    }
+
     private var refreshFailedBanner: some View {
         Label("Couldn’t reach Engaging Networks. Pull down to try again.", systemImage: "exclamationmark.triangle")
             .font(.subheadline)
@@ -116,7 +133,7 @@ struct PulseView: View {
                     .foregroundStyle(Color.compassSecondaryText)
                 Spacer()
                 if let change = fact.change {
-                    ChangeBadge(change: change, suffix: " in the last 7 days")
+                    ChangeBadge(change: change, suffix: " in the last \(fact.period.span)")
                 }
             }
             Text(fact.formattedValue)
@@ -151,7 +168,7 @@ struct PulseView: View {
         return weeks == 1 ? "1 week ago" : "\(weeks) weeks ago"
     }
 
-    // MARK: Weekly tiles
+    // MARK: Period tiles
 
     private var tiles: some View {
         let columns = dynamicTypeSize.isAccessibilitySize ? 1 : 2
@@ -227,11 +244,11 @@ private struct MetricTile: View {
                 .minimumScaleFactor(0.6)
             if let change = fact.change {
                 ChangeBadge(change: change)
-                Text("vs previous 7 days")
+                Text("vs \(fact.period.before)")
                     .font(.caption)
                     .foregroundStyle(Color.compassSecondaryText)
             } else {
-                Text("Last 7 days")
+                Text(fact.period.title)
                     .font(.caption)
                     .foregroundStyle(Color.compassSecondaryText)
             }

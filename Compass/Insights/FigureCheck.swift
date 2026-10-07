@@ -17,9 +17,14 @@ nonisolated enum FigureCheck {
             .split { !$0.isLetter && !$0.isNumber && $0 != "'" }
             .map(String.init)
         let words = Set(tokens)
-        // "yesterday" is the right word only when the figures are for yesterday.
-        let banned = facts.first?.period == .yesterday ? bannedWords.subtracting(["yesterday"]) : bannedWords
+        // "yesterday" and "month" are the right words only for their own period, and
+        // "this month" never is: the month the figures cover is over.
+        let period = facts.first?.period
+        var banned = bannedWords
+        if period == .yesterday { banned.remove("yesterday") }
+        if period != .lastMonth { banned.formUnion(["month", "months", "month's", "monthly"]) }
         guard words.isDisjoint(with: banned) else { return false }
+        if zip(tokens, tokens.dropFirst()).contains(where: { $0 == "this" && $1 == "month" }) { return false }
 
         // "half" and "doubled" are figures too: fine only when the app shows that change.
         if !words.isDisjoint(with: halfWords), !facts.contains(where: { $0.changed(.down, by: "50%") }) {
