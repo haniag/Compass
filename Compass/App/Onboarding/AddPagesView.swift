@@ -11,15 +11,18 @@ import SwiftUI
 struct AddPagesView: View {
     var onContinue: () -> Void
 
+    private let credentials: ENCredentials
     @State private var model: AddPagesViewModel
     @State private var showingPicker = false
-    @Query private var followed: [FollowedPage]
+    @State private var addingDonationPage = false
+    @Query(sort: \FollowedPage.name) private var followed: [FollowedPage]
     @Environment(\.modelContext) private var modelContext
 
     private static let campaignIDHelpURL = URL(string: "https://knowledge.engagingnetworks.net/datareports/public-data-services-using-a-token-public-api#Publicdataservicesusingatoken(publicAPI)-campaignId")!
 
     init(credentials: ENCredentials, onContinue: @escaping () -> Void) {
         self.onContinue = onContinue
+        self.credentials = credentials
         _model = State(initialValue: AddPagesViewModel(credentials: credentials))
     }
 
@@ -28,6 +31,7 @@ struct AddPagesView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 pagesCard
+                donationPagesCard
                 eventsCard
                 Button {
                     model.save(in: modelContext)
@@ -48,6 +52,9 @@ struct AddPagesView: View {
         .foregroundStyle(Color.compassText)
         .sheet(isPresented: $showingPicker) {
             PagePickerSheet(model: model)
+        }
+        .sheet(isPresented: $addingDonationPage) {
+            AddDonationPageSheet(credentials: credentials)
         }
         .task { await model.load(alreadyFollowed: followed) }
     }
@@ -88,7 +95,7 @@ struct AddPagesView: View {
             } else {
                 FlowLayout(spacing: 8) {
                     ForEach(model.selectedPages, id: \.id) { page in
-                        chip(id: page.id, name: page.name)
+                        chip(name: page.name) { model.toggle(page.id) }
                     }
                 }
             }
@@ -128,10 +135,8 @@ struct AddPagesView: View {
         .accessibilityHint("Opens a searchable list of pages in your account")
     }
 
-    private func chip(id: Int, name: String) -> some View {
-        Button {
-            model.toggle(id)
-        } label: {
+    private func chip(name: String, remove: @escaping () -> Void) -> some View {
+        Button(action: remove) {
             HStack(spacing: 6) {
                 Text(name)
                     .lineLimit(1)
@@ -149,6 +154,36 @@ struct AddPagesView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Remove \(name)")
+    }
+
+    /// Donation pages added by link: the only way Giving can show a page (it needs the
+    /// page's own ID, and the campaign list above doesn't have it).
+    private var donationPagesCard: some View {
+        let linked = followed.filter { $0.pageId != nil }
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Donation pages for Giving")
+                .font(.headline)
+            Text("Paste a donation page’s link to see what it raises, day by day, in the Giving tab.")
+                .font(.subheadline)
+                .foregroundStyle(Color.compassSecondaryText)
+            if !linked.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(linked) { page in
+                        chip(name: page.name) { model.stopFollowing(page, in: modelContext) }
+                    }
+                }
+            }
+            Button {
+                addingDonationPage = true
+            } label: {
+                Label(linked.isEmpty ? "Add a donation page" : "Add another", systemImage: "plus")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.compassTeal)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+        }
+        .compassCard()
     }
 
     /// Shown when EN won't list the account's campaigns: add them one by one by ID.

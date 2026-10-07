@@ -2,7 +2,8 @@
 //  AddPagesViewModel.swift
 //  Compass
 //
-//  Onboarding step 2: choose which pages and events Compass tracks.
+//  Onboarding step 2: choose which pages and events Compass tracks. Donation pages
+//  added by link (for Giving) are saved straight away and managed in their own card.
 //
 
 import Foundation
@@ -52,8 +53,10 @@ final class AddPagesViewModel {
 
         if !alreadyFollowed.isEmpty {
             preselectEvents = false
-            selectedIDs = Set(alreadyFollowed.map(\.campaignId))
-            for page in alreadyFollowed {
+            // Pages added by link have their own card, so they aren't chips here too.
+            let picked = alreadyFollowed.filter { $0.pageId == nil }
+            selectedIDs = Set(picked.map(\.campaignId))
+            for page in picked {
                 followedNames[page.campaignId] = (page.name, page.kind)
             }
         }
@@ -177,10 +180,17 @@ final class AddPagesViewModel {
 
     // MARK: Saving
 
-    /// Replaces the followed pages with the current selection.
+    /// Stops following a page added by link.
+    func stopFollowing(_ page: FollowedPage, in context: ModelContext) {
+        context.delete(page)
+        try? context.save()
+    }
+
+    /// Replaces the followed pages with the current selection. Pages added by link
+    /// are kept: they're removed from their own card.
     func save(in context: ModelContext) {
         let existing = (try? context.fetch(FetchDescriptor<FollowedPage>())) ?? []
-        for page in existing where !selectedIDs.contains(page.campaignId) {
+        for page in existing where page.pageId == nil && !selectedIDs.contains(page.campaignId) {
             context.delete(page)
         }
 
