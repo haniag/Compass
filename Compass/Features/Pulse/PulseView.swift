@@ -29,7 +29,22 @@ struct PulseView: View {
                         supportersCard(supporters)
                     }
                     tiles
-                    if let insight = model.topInsight {
+                    if model.isWritingBriefing {
+                        topCard(writtenWithAI: true) {
+                            HStack(spacing: 10) {
+                                ProgressView()
+                                Text("Writing your briefing…")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.compassSecondaryText)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 60)
+                        }
+                    } else if let briefing = model.briefing {
+                        topCard(writtenWithAI: true) {
+                            Text(briefing)
+                                .font(.system(.title3, design: .serif))
+                        }
+                    } else if let insight = model.topInsight {
                         insightCard(insight)
                     }
                 } else if model.isRefreshing {
@@ -44,6 +59,7 @@ struct PulseView: View {
         .foregroundStyle(Color.compassText)
         .refreshable { await model.refresh(in: modelContext) }
         .task { await model.refreshIfStale(in: modelContext) }
+        .task(id: model.allFacts) { await model.writeBriefing() }
     }
 
     // MARK: Header
@@ -149,18 +165,9 @@ struct PulseView: View {
 
     // MARK: Insight
 
+    /// The template's top insight, shown when there's no briefing.
     private func insightCard(_ insight: Insight) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Top insight", systemImage: "sparkles")
-                    .font(.footnote.weight(.semibold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(Color.compassTeal)
-                Spacer()
-                Label("On-device", systemImage: "lock")
-                    .font(.caption)
-                    .foregroundStyle(Color.compassSecondaryText)
-            }
+        topCard(writtenWithAI: false) {
             Text(insight.title)
                 .font(.system(.title3, design: .serif, weight: .bold))
             Text(insight.explanation)
@@ -170,6 +177,23 @@ struct PulseView: View {
                     .font(.subheadline)
                     .foregroundStyle(Color.compassSecondaryText)
             }
+        }
+    }
+
+    private func topCard(writtenWithAI: Bool, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(writtenWithAI ? "Your briefing" : "Top insight", systemImage: "sparkles")
+                    .font(.footnote.weight(.semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Color.compassTeal)
+                Spacer()
+                Label(writtenWithAI ? "Apple Intelligence" : "On-device",
+                      systemImage: writtenWithAI ? "apple.intelligence" : "lock")
+                    .font(.caption)
+                    .foregroundStyle(Color.compassSecondaryText)
+            }
+            content()
             Button(action: onSeeAllInsights) {
                 HStack(spacing: 2) {
                     Text("See all insights")

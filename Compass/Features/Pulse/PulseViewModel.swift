@@ -22,6 +22,10 @@ final class PulseViewModel {
     private(set) var weeklyFacts: [Fact] = []
     private(set) var supporterTrend: [SupporterTrend.Point] = []
     private(set) var topInsight: Insight?
+    /// Apple Intelligence's two-sentence briefing. Nil without it, or when it broke the rules;
+    /// the card then shows `topInsight`.
+    private(set) var briefing: String?
+    private(set) var isWritingBriefing = false
     private(set) var lastUpdated: Date?
     private(set) var isRefreshing = false
     /// True when the last refresh got nothing back at all (e.g. offline).
@@ -29,6 +33,7 @@ final class PulseViewModel {
 
     private let credentials: ENCredentials
     private let client: ENClient
+    private var briefingFacts: [Fact]?
 
     init(credentials: ENCredentials) {
         self.credentials = credentials
@@ -113,5 +118,25 @@ final class PulseViewModel {
         topInsight = TemplateInsights.pulse(facts: facts)
         lastUpdated = now
         refreshFailed = false
+    }
+
+    // MARK: Briefing
+
+    /// Writes the briefing when the numbers change. Cheap to call again with the same numbers.
+    func writeBriefing() async {
+        let facts = allFacts
+        guard facts != briefingFacts else { return }
+        briefing = nil
+        // A cancelled earlier run may have left this on.
+        isWritingBriefing = false
+        guard InsightWriter.status == .available, !facts.isEmpty else { return }
+
+        isWritingBriefing = true
+        let text = await BriefingWriter.briefing(from: facts)
+        // The numbers changed again, or the screen went away; it'll be written next time.
+        guard !Task.isCancelled, facts == allFacts else { return }
+        briefing = text
+        briefingFacts = facts
+        isWritingBriefing = false
     }
 }

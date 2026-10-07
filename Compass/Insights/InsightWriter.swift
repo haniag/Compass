@@ -9,8 +9,12 @@
 
 import Foundation
 import FoundationModels
+import os
 
 nonisolated enum InsightWriter {
+    /// Why a draft failed or was rejected. Never logs figures or personal data.
+    static let log = Logger(subsystem: "com.fursa.Compass", category: "AI")
+
     enum Status: Equatable, Sendable {
         case available
         /// The device supports it but Apple Intelligence is off in Settings.
@@ -63,9 +67,14 @@ nonisolated enum InsightWriter {
                 } catch {
                     // The model refused or failed on this fact (e.g. a safety check).
                     // Skip it; its template insight fills the gap.
+                    log.error("Draft for \(fact.id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
                     break
                 }
-                if InsightCheck.validated([draft], facts: [fact]).count == 1 || attempt == 2 {
+                let passed = InsightCheck.validated([draft], facts: [fact]).count == 1
+                if !passed {
+                    log.notice("Draft for \(fact.id, privacy: .public) broke the copy rules (attempt \(attempt)): \(draft.title, privacy: .public) | \(draft.explanation, privacy: .public) | \(draft.suggestedAction ?? "", privacy: .public)")
+                }
+                if passed || attempt == 2 {
                     drafts.append(draft)
                     break
                 }
