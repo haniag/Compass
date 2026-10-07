@@ -131,7 +131,7 @@ struct EmailView: View {
 
     private func bestDayCard(_ best: EmailStats.WeekdayRate) -> some View {
         let dayName = Calendar.current.weekdaySymbols[best.weekday - 1]
-        let rate = best.openRate.map(EmailFormat.compactPercent) ?? ""
+        let rate = best.clickRate.map(EmailFormat.compactPercent) ?? ""
         return VStack(alignment: .leading, spacing: 12) {
             ViewThatFits(in: .horizontal) {
                 HStack {
@@ -146,11 +146,18 @@ struct EmailView: View {
             }
             WeekdayChart(days: model.weekdays, bestWeekday: best.weekday)
                 .frame(height: 120)
-            Text("Emails sent on a \(dayName) get your best open rate: \(rate). Based on your sends in the last \(EmailViewModel.historyDays) days.")
+            Text("Emails sent on a \(dayName) got your best click rate: \(rate) of them led to a click. Based on your sends in the last \(EmailViewModel.historyDays) days\(skippedDaysNote).")
                 .font(.footnote)
                 .foregroundStyle(Color.compassSecondaryText)
         }
         .compassCard()
+    }
+
+    /// "; days with fewer than 3 sends aren't shown", when some were left out of the chart.
+    private var skippedDaysNote: String {
+        let minimum = EmailStats.minimumSendsForBestDay
+        let skipped = model.weekdays.contains { $0.sends > 0 && $0.sends < minimum }
+        return skipped ? "; days with fewer than \(minimum) sends aren’t shown" : ""
     }
 
     private var bestDayTitle: some View {
@@ -160,7 +167,7 @@ struct EmailView: View {
     }
 
     private var bestDaySubtitle: some View {
-        Text("Open rate by day")
+        Text("Click rate by day")
             .font(.footnote)
             .foregroundStyle(Color.compassSecondaryText)
     }
@@ -264,10 +271,12 @@ private struct WeekdayChart: View {
 
     var body: some View {
         Chart(days) { day in
-            if let rate = day.openRate {
+            // Days with too few sends aren't drawn: a tall bar from one email would
+            // outshine the day named best.
+            if let rate = day.clickRate, day.sends >= EmailStats.minimumSendsForBestDay {
                 BarMark(
                     x: .value("Day", Self.shortName(day.weekday)),
-                    y: .value("Open rate", NSDecimalNumber(decimal: rate).doubleValue),
+                    y: .value("Click rate", NSDecimalNumber(decimal: rate).doubleValue),
                     width: .ratio(0.6)
                 )
                 .cornerRadius(6)
@@ -292,13 +301,15 @@ private struct WeekdayChart: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Open rate by day of the week")
+        .accessibilityLabel("Click rate by day of the week")
         .accessibilityValue(summary)
     }
 
-    /// e.g. "Tuesday is highest, at 44%. Saturday is lowest, at 30%."
+    /// e.g. "Tuesday is highest, at 5.2%. Saturday is lowest, at 2.1%."
     private var summary: String {
-        let withSends = days.compactMap { day in day.openRate.map { (weekday: day.weekday, rate: $0) } }
+        let withSends = days
+            .filter { $0.sends >= EmailStats.minimumSendsForBestDay }
+            .compactMap { day in day.clickRate.map { (weekday: day.weekday, rate: $0) } }
         guard let best = withSends.first(where: { $0.weekday == bestWeekday }) else { return "" }
         var text = "\(Self.fullName(best.weekday)) is highest, at \(EmailFormat.compactPercent(best.rate))."
         if let lowest = withSends.min(by: { $0.rate < $1.rate }), lowest.weekday != best.weekday {

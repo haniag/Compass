@@ -71,33 +71,39 @@ nonisolated enum EmailStats {
 
     // MARK: Best day to send
 
+    /// A day can be named "best" only with at least this many sends on it. Clicks are
+    /// rarer than opens, so one or two sends say little.
+    static let minimumSendsForBestDay = 3
+
     struct WeekdayRate: Identifiable, Hashable, Sendable {
         /// 1 = Sunday … 7 = Saturday, as in Calendar.
         let weekday: Int
         let sends: Int
+        /// Click rate (CTR): total clicks ÷ total emails sent that day of the week.
         /// Nil for a day with no sends.
-        let openRate: Decimal?
+        let clickRate: Decimal?
 
         var id: Int { weekday }
     }
 
-    /// Open rate for each day of the week, all seven days, in the calendar's own order
-    /// (Sunday or Monday first, depending on the region).
-    static func openRateByWeekday(_ broadcasts: [ENBroadcast], calendar: Calendar = .current) -> [WeekdayRate] {
+    /// Click rate for each day of the week, all seven days, in the calendar's own order
+    /// (Sunday or Monday first, depending on the region). Clicks, not opens: Apple Mail
+    /// and some spam filters open every email automatically, so opens overstate readers.
+    static func clickRateByWeekday(_ broadcasts: [ENBroadcast], calendar: Calendar = .current) -> [WeekdayRate] {
         let byWeekday = Dictionary(grouping: broadcasts) { calendar.component(.weekday, from: $0.sentOn) }
         return (0..<7).map { offset in
             let weekday = (calendar.firstWeekday - 1 + offset) % 7 + 1
             let totals = Totals(byWeekday[weekday] ?? [])
-            return WeekdayRate(weekday: weekday, sends: totals.sends, openRate: totals.openRate)
+            return WeekdayRate(weekday: weekday, sends: totals.sends, clickRate: totals.clickRate)
         }
     }
 
-    /// The day with the highest open rate, counting only days with 2 or more sends.
+    /// The day with the highest click rate, counting only days with 3 or more sends.
     /// Nil until sends are spread over at least 3 days of the week.
     static func bestWeekday(_ days: [WeekdayRate]) -> Int? {
         guard days.filter({ $0.sends > 0 }).count >= 3 else { return nil }
-        let candidates = days.filter { $0.sends >= 2 }
-            .compactMap { day in day.openRate.map { (weekday: day.weekday, rate: $0) } }
+        let candidates = days.filter { $0.sends >= minimumSendsForBestDay }
+            .compactMap { day in day.clickRate.map { (weekday: day.weekday, rate: $0) } }
         // max(by:) keeps the first of equal days.
         return candidates.max { $0.rate < $1.rate }?.weekday
     }

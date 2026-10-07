@@ -86,7 +86,7 @@ final class EmailViewModel {
         rates = EmailStats.rates(sends, in: period)
         sendsInPeriod = sends.filter { period.contains($0.sentOn) }.count
         recentSends = Array(sends.prefix(Self.recentSendCount))
-        weekdays = EmailStats.openRateByWeekday(sends)
+        weekdays = EmailStats.clickRateByWeekday(sends)
         bestWeekday = EmailStats.bestWeekday(weekdays)
         usualUnsubscribeRate = EmailStats.usualUnsubscribeRate(sends)
         fatigue = EmailStats.listFatigue(sends)

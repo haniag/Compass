@@ -120,33 +120,42 @@ struct BestDayTests {
     }
 
     // Oct 5 2026 is a Monday.
-    private let monday1 = TestDates.date(2026, 9, 28), monday2 = TestDates.date(2026, 10, 5)
-    private let tuesday1 = TestDates.date(2026, 9, 29), tuesday2 = TestDates.date(2026, 10, 6)
-    private let friday = TestDates.date(2026, 10, 2)
+    private let mondays = [TestDates.date(2026, 9, 21), TestDates.date(2026, 9, 28), TestDates.date(2026, 10, 5)]
+    private let tuesdays = [TestDates.date(2026, 9, 22), TestDates.date(2026, 9, 29), TestDates.date(2026, 10, 6)]
+    private let fridays = [TestDates.date(2026, 9, 25), TestDates.date(2026, 10, 2)]
 
     @Test func allSevenDaysInTheCalendarsOrder() {
-        let days = EmailStats.openRateByWeekday([send(on: tuesday2, opens: 450)], calendar: calendar)
+        let days = EmailStats.clickRateByWeekday([send(on: tuesdays[2], opens: 450, clicks: 45)], calendar: calendar)
         #expect(days.map(\.weekday) == [2, 3, 4, 5, 6, 7, 1])
         #expect(days[1].sends == 1)
-        #expect(days[1].openRate == 45)
-        #expect(days[2].openRate == nil)  // no Wednesday sends
+        #expect(days[1].clickRate == Decimal(string: "4.5"))  // 45 clicks ÷ 1,000 sent
+        #expect(days[2].clickRate == nil)  // no Wednesday sends
     }
 
-    @Test func bestDayNeedsTwoSendsOnThatDay() {
-        let days = EmailStats.openRateByWeekday([
-            send(on: monday1, opens: 320), send(on: monday2, opens: 300),
-            send(on: tuesday1, opens: 430), send(on: tuesday2, opens: 450),
-            send(on: friday, opens: 600),  // highest, but only one send
-        ], calendar: calendar)
-        #expect(days[1].openRate == 44)
+    @Test func bestDayIsByClicksNotOpens() {
+        let days = EmailStats.clickRateByWeekday(
+            mondays.map { send(on: $0, opens: 600, clicks: 30) }      // most opens, 3% clicks
+                + tuesdays.map { send(on: $0, opens: 350, clicks: 50) }  // fewer opens, 5% clicks
+                + fridays.map { send(on: $0, opens: 400, clicks: 90) },  // 9%, but only two sends
+            calendar: calendar)
+        #expect(days[0].clickRate == 3)
+        #expect(days[1].clickRate == 5)
         #expect(EmailStats.bestWeekday(days) == 3)  // Tuesday
     }
 
+    @Test func noBestDayWithoutThreeSendsOnADay() {
+        let days = EmailStats.clickRateByWeekday(
+            mondays.prefix(2).map { send(on: $0, clicks: 30) }
+                + tuesdays.prefix(2).map { send(on: $0, clicks: 50) }
+                + fridays.map { send(on: $0, clicks: 90) },
+            calendar: calendar)
+        #expect(EmailStats.bestWeekday(days) == nil)
+    }
+
     @Test func noBestDayUntilThreeDaysOfTheWeekHaveSends() {
-        let days = EmailStats.openRateByWeekday([
-            send(on: monday1, opens: 320), send(on: monday2, opens: 300),
-            send(on: tuesday1, opens: 430), send(on: tuesday2, opens: 450),
-        ], calendar: calendar)
+        let days = EmailStats.clickRateByWeekday(
+            mondays.map { send(on: $0, clicks: 30) } + tuesdays.map { send(on: $0, clicks: 50) },
+            calendar: calendar)
         #expect(EmailStats.bestWeekday(days) == nil)
     }
 }
