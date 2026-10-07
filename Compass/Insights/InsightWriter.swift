@@ -42,7 +42,7 @@ nonisolated enum InsightWriter {
         - Speak to the reader as "you" and "your supporters". Never write "we", "us", "our" or "let's".
         - Use plain, warm, specific words: supporters, gifts, appeals, actions.
         - You may quote the fact's figures, with digits, exactly as they are written in the fact. \
-        Never calculate, round or estimate a new figure, and never use "half", "twice" or "percent".
+        Never calculate, round or estimate a new figure.
         - Say "in the last 7 days" or "the 7 days before". Never say "today", "yesterday" or "week".
         - Say only what the fact shows: whether it went up or down, and why that matters. \
         Don't praise or mention anything else (appeals, emails, campaigns), don't guess at causes, \

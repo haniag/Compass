@@ -12,12 +12,29 @@ nonisolated enum FigureCheck {
     /// True when every number in `text` is one of these facts' figures, and the text
     /// doesn't speak as "we", name the wrong time period, or work out amounts in words.
     static func quotesOnlyFigures(of facts: [Fact], in text: String) -> Bool {
-        let words = Set(text.lowercased()
-            .split { !$0.isLetter && $0 != "’" && $0 != "'" }
-            .map { $0.replacingOccurrences(of: "’", with: "'") })
+        // Words and digit runs, in order: "fifty percent" → ["fifty", "percent"].
+        let tokens = text.lowercased().replacingOccurrences(of: "’", with: "'")
+            .split { !$0.isLetter && !$0.isNumber && $0 != "'" }
+            .map(String.init)
+        let words = Set(tokens)
         guard words.isDisjoint(with: bannedWords) else { return false }
+
+        // "half" and "doubled" are figures too: fine only when the app shows that change.
+        if !words.isDisjoint(with: halfWords), !facts.contains(where: { $0.changed(.down, by: "50%") }) {
+            return false
+        }
+        if !words.isDisjoint(with: doubleWords), !facts.contains(where: { $0.changed(.up, by: "100%") }) {
+            return false
+        }
+        // "percent" only right after a number ("fifty percent", "50 percent"), never "a few percent".
+        for (index, token) in tokens.enumerated() where token == "percent" || token == "percentage" {
+            guard index > 0 else { return false }
+            let before = tokens[index - 1]
+            guard before.first?.isNumber == true || spelledNumbers[before] != nil else { return false }
+        }
+
         // "nine" is fine when 9 is one of the figures. "one" is left alone: it's mostly not a figure.
-        let spelled = words.compactMap { spelledNumbers[$0] }
+        let spelled = tokens.compactMap { spelledNumbers[$0] }
         return Set(numbers(in: text) + spelled).isSubset(of: allowedNumbers(facts))
     }
 
@@ -44,16 +61,28 @@ nonisolated enum FigureCheck {
         "we", "we're", "we've", "we'll", "us", "our", "ours", "let's",
         // The figures cover the last 7 days, not a day or a calendar week.
         "today", "yesterday", "tonight", "week", "weeks", "week's", "weekly",
-        // Figures worked out by the model, or too big to check when spelled out.
-        // "percent" too: figures are quoted as written ("13%"), and "a few percent" hides none.
-        "half", "halved", "double", "doubled", "twice", "triple", "tripled", "third", "quarter",
-        "percent", "percentage", "twenty", "thirty", "forty", "fifty", "hundred",
-        "hundreds", "thousand", "thousands", "million", "millions", "dozen", "dozens",
+        // Amounts in words the check can't match to a figure.
+        "triple", "tripled", "third", "thirds", "quarter", "quarters",
+        "hundred", "hundreds", "thousand", "thousands", "million", "millions", "dozen", "dozens",
     ]
 
-    /// Small numbers the model likes to spell out; checked like digits.
+    /// Allowed only when a figure fell 50%.
+    private static let halfWords: Set<String> = ["half", "halved", "halving"]
+    /// Allowed only when a figure rose 100%.
+    private static let doubleWords: Set<String> = ["double", "doubled", "doubling", "twice"]
+
+    /// Numbers the model likes to spell out; checked like digits.
     private static let spelledNumbers: [String: Decimal] = [
         "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
         "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+        "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+        "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
     ]
+}
+
+private nonisolated extension Fact {
+    /// True when the app shows this change: `changed(.down, by: "50%")` for 8 → 4.
+    func changed(_ direction: FactChange.Direction, by text: String) -> Bool {
+        change?.direction == direction && change?.text == text
+    }
 }
