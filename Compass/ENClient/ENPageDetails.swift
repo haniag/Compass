@@ -39,13 +39,14 @@ nonisolated struct ENPageDetails: Hashable, Sendable {
         )
     }
 
-    /// Donation and event pages take payments, so they have giving to show.
-    var takesGifts: Bool { type == "donation" || type == "event" }
+    /// Donation, peer-to-peer donation and event pages take payments, so they have giving to show.
+    var takesGifts: Bool { ["donation", "p2pdonation", "event"].contains(type) }
 
     /// "petition", "survey"… for messages.
     var typeLabel: String {
         switch type {
         case "donation": "donation"
+        case "p2pdonation": "peer-to-peer donation"
         case "event": "event"
         case "advocacypetition": "petition"
         case "emailtotarget", "tweettotarget", "calltotarget": "action"

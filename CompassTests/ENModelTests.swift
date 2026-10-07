@@ -105,6 +105,13 @@ struct ENModelTests {
         #expect(ENPageDetails(html: "var pageJson = {not json};</script>") == nil)
     }
 
+    @Test func peerToPeerPagesTakeGifts() {
+        // Real test-account page type (Oct 2026).
+        let p2p = ENPageDetails(pageId: 16315, campaignId: 13186, name: "x", type: "p2pdonation")
+        #expect(p2p.takesGifts)
+        #expect(p2p.typeLabel == "peer-to-peer donation")
+    }
+
     @Test func petitionsDontTakeGifts() {
         let petition = ENPageDetails(pageId: 1, campaignId: 2, name: "x", type: "advocacypetition")
         #expect(!petition.takesGifts)

@@ -26,6 +26,13 @@ struct ContentView: View {
         .tint(Color.compassTeal)
         // The design only defines light colors so far.
         .preferredColorScheme(.light)
+        #if DEBUG
+        .task(id: credentials) {
+            if let credentials {
+                await DebugDefaultPages.followIfNeeded(credentials: credentials, in: modelContext)
+            }
+        }
+        #endif
     }
 
     private func disconnect() {
@@ -33,6 +40,9 @@ struct ContentView: View {
         try? modelContext.delete(model: FollowedPage.self)
         try? modelContext.delete(model: SupporterSnapshot.self)
         try? modelContext.save()
+        #if DEBUG
+        DebugDefaultPages.reset()
+        #endif
         hasFinishedOnboarding = false
         credentials = nil
     }
