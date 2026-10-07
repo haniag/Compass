@@ -1,0 +1,19 @@
+# Secrets: both hold the Engaging Networks test token. Never commit them.
+Compass/App/Onboarding/DebugTestAccount.swift
+data.txt
+
+# Xcode per-user and build files
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# PromptLab (Swift package) build output
+PromptLab/.build/
+.swiftpm/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# macOS
+.DS_Store
