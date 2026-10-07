@@ -10,7 +10,7 @@
 import Foundation
 
 nonisolated enum TemplateInsights {
-    /// Pulse's "Top insight": the biggest mover, or a steady-week note. Nil with no facts.
+    /// Pulse's "Top insight": the biggest mover, or a steady note. Nil with no facts.
     static func pulse(facts: [Fact]) -> Insight? {
         if let fact = InsightRules.pulseHighlight(from: facts), let insight = insight(about: fact) {
             return insight
@@ -18,7 +18,7 @@ nonisolated enum TemplateInsights {
         return steady(facts.filter { $0.metric != .supporters }, othersMoved: false)
     }
 
-    /// The Insights tab's weekly digest: one insight per fact that moved, needs-attention
+    /// The Insights tab's digest: one insight per fact that moved, needs-attention
     /// first, then a steady note for the rest. Empty with no facts.
     static func digest(facts: [Fact]) -> [Insight] {
         let highlights = InsightRules.highlights(from: facts)
@@ -30,7 +30,7 @@ nonisolated enum TemplateInsights {
         highlights.compactMap(insight(about:)).sorted { $0.severity.rank < $1.severity.rank }
     }
 
-    /// The weekly facts that didn't make the highlights, as one "steady" insight.
+    /// The facts that didn't make the highlights, as one "steady" insight.
     static func steadyNote(facts: [Fact], highlights: [Fact]) -> Insight? {
         let highlighted = Set(highlights.map(\.id))
         let quiet = facts.filter { $0.metric != .supporters && !highlighted.contains($0.id) }
@@ -42,7 +42,7 @@ nonisolated enum TemplateInsights {
         let rising = change.direction == .up
         return Insight(
             id: "template.\(fact.id)",
-            title: title(for: fact.metric, rising: rising),
+            title: title(for: fact, rising: rising),
             severity: severity(for: fact),
             factIDs: [fact.id],
             explanation: explanation(for: fact, change: change),
@@ -54,12 +54,13 @@ nonisolated enum TemplateInsights {
         guard !facts.isEmpty else { return nil }
         let names = facts.map(\.plainName).formatted(.list(type: .and))
         let verb = facts.count == 1 && !facts[0].plainName.hasSuffix("s") ? "is" : "are"
+        let period = facts[0].period
         return Insight(
             id: "template.steady",
-            title: othersMoved ? "Everything else held steady" : "A steady 7 days",
+            title: othersMoved ? "Everything else held steady" : "A steady \(period.span)",
             severity: .neutral,
             factIDs: facts.map(\.id),
-            explanation: "Your \(names) \(verb) close to the 7 days before.".capitalizedFirst,
+            explanation: "Your \(names) \(verb) close to \(period.before).".capitalizedFirst,
             suggestedAction: nil
         )
     }
@@ -80,35 +81,38 @@ nonisolated enum TemplateInsights {
 
     // MARK: Wording
 
-    private static func title(for metric: Fact.Metric, rising: Bool) -> String {
-        switch (metric, rising) {
-        case (.newJoins, true): "More people joined in the last 7 days"
-        case (.newJoins, false): "Fewer people joined in the last 7 days"
-        case (.raised, true): "Giving is up over the last 7 days"
-        case (.raised, false): "Giving dipped over the last 7 days"
-        case (.averageGift, true): "Gifts were larger in the last 7 days"
-        case (.averageGift, false): "Gifts were smaller in the last 7 days"
-        case (.emailOpenRate, true): "More people opened your emails"
-        case (.emailOpenRate, false): "Fewer people opened your emails"
-        case (.supporters, true): "Your list grew in the last 7 days"
-        case (.supporters, false): "Your list shrank in the last 7 days"
+    private static func title(for fact: Fact, rising: Bool) -> String {
+        let during = fact.period.during
+        switch (fact.metric, rising) {
+        case (.newJoins, true): return "More people joined \(during)"
+        case (.newJoins, false): return "Fewer people joined \(during)"
+        case (.raised, true): return "Giving rose \(during)"
+        case (.raised, false): return "Giving dipped \(during)"
+        case (.averageGift, true): return "Gifts were larger \(during)"
+        case (.averageGift, false): return "Gifts were smaller \(during)"
+        case (.emailOpenRate, true): return "More people opened your emails"
+        case (.emailOpenRate, false): return "Fewer people opened your emails"
+        // Supporters is a count now vs one period ago: "grew in the last month".
+        case (.supporters, true): return "Your list grew in the last \(fact.period.span)"
+        case (.supporters, false): return "Your list shrank in the last \(fact.period.span)"
         }
     }
 
     private static func explanation(for fact: Fact, change: FactChange) -> String {
         let before = fact.formattedBaseline ?? ""
-        let comparison = "\(change.phrase) from \(before) in the 7 days before"
+        let during = fact.period.during
+        let comparison = "\(change.phrase) from \(before) \(fact.period.duringBefore)"
         switch fact.metric {
         case .newJoins:
-            return "\(fact.formattedValue) people joined in the last 7 days, \(comparison)."
+            return "\(fact.formattedValue) people joined \(during), \(comparison)."
         case .raised:
-            return "You raised \(fact.formattedValue) in the last 7 days, \(comparison)."
+            return "You raised \(fact.formattedValue) \(during), \(comparison)."
         case .averageGift:
-            return "Your average gift was \(fact.formattedValue) in the last 7 days, \(comparison)."
+            return "Your average gift was \(fact.formattedValue) \(during), \(comparison)."
         case .emailOpenRate:
-            return "\(fact.formattedValue) of people opened your emails in the last 7 days, \(comparison)."
+            return "\(fact.formattedValue) of people opened your emails \(during), \(comparison)."
         case .supporters:
-            return "You have \(fact.formattedValue) supporters, \(comparison)."
+            return "You have \(fact.formattedValue) supporters, \(change.phrase) from \(before) \(fact.period.spanAgo)."
         }
     }
 
@@ -152,7 +156,8 @@ nonisolated private extension Fact {
     }
 }
 
-private extension String {
+extension String {
+    /// "The 7 days before" from "the 7 days before".
     nonisolated var capitalizedFirst: String {
         prefix(1).uppercased() + dropFirst()
     }

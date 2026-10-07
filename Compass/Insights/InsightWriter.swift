@@ -35,27 +35,32 @@ nonisolated enum InsightWriter {
         }
     }
 
-    static let digestInstructions = """
-        You write one insight for a weekly digest read by the staff of a nonprofit: \
+    /// The worked example uses the same period words as the fact, e.g. "in the last 7 days".
+    static func digestInstructions(for period: Fact.Period) -> String {
+        let during = period.during
+        let before = period.duringBefore
+        return """
+        You write one insight for a digest read by the staff of a nonprofit: \
         fundraisers, email managers and campaigners. The app has already worked out \
         the numbers; you only put one fact into words.
         - Speak to the reader as "you" and "your supporters". Never write "we", "us", "our" or "let's".
         - Use plain, warm, specific words: supporters, gifts, appeals, actions.
         - You may quote the fact's figures, with digits, exactly as they are written in the fact. \
         Never calculate, round or estimate a new figure.
-        - Say "in the last 7 days" or "the 7 days before". Never say "today", "yesterday" or "week".
+        - Say "\(during)" or "\(period.before)". \(period.wordsToAvoid)
         - Say only what the fact shows: whether it went up or down, and why that matters. \
         Don't praise or mention anything else (appeals, emails, campaigns), don't guess at causes, \
         and don't compare with other organizations.
         - Keep the next step out of the explanation; it goes only in the suggested action.
 
         An example of the style only, about a figure the app doesn't track; never copy its words:
-        Fact: Event registrations: 64 in the last 7 days, 80 in the 7 days before (down 20%). This needs attention.
+        Fact: Event registrations: 64 \(during), 80 \(before) (down 20%). This needs attention.
         title: Event registrations slipped 20%
-        explanation: 64 people registered in the last 7 days, down from 80 in the 7 days before. \
+        explanation: 64 people registered \(during), down from 80 \(before). \
         Fewer registrations now can mean a quieter room on the day.
         suggestedAction: Remind past attendees that the event is coming up.
         """
+    }
 
     /// Up to one draft per fact InsightRules picked, in the same order. Each fact gets its own
     /// short request: the on-device model is much more reliable with one thing at a time.
@@ -91,7 +96,7 @@ nonisolated enum InsightWriter {
     }
 
     private static func draft(about fact: Fact) async throws -> InsightDraft {
-        let session = LanguageModelSession(instructions: digestInstructions)
+        let session = LanguageModelSession(instructions: digestInstructions(for: fact.period))
         let words = try await session.respond(
             to: prompt(for: fact),
             generating: GeneratedInsight.self,
@@ -133,26 +138,30 @@ nonisolated enum InsightWriter {
 
 /// A conversation about the numbers. Follow-up questions see earlier answers.
 final class NumbersChat {
-    static let instructions = """
+    static func instructions(for period: Fact.Period) -> String {
+        """
         You answer questions from nonprofit staff about their organization's numbers.
         - Answer in one to three short, plain sentences. Be encouraging and specific.
         - Never write digits, amounts or percentages. The app shows the figures for the facts you cite. \
-        Compare in words instead, like "more than the 7 days before" or "about the same".
+        Compare in words instead, like "more than \(period.before)" or "about the same".
         - If the figures can't answer the question, say so plainly. Never guess or invent numbers.
         - Speak to the reader as "you". Never write "we", "us", "our" or "let's".
         - Don't mention dates or time periods, and don't restate amounts in words \
         (no "half", "twice" or "percent"); the app shows them with the figures.
         """
+    }
 
     private let facts: [Fact]
+    private let instructions: String
     private var session: LanguageModelSession
     private var usesTool = true
 
     init(facts: [Fact]) {
         self.facts = facts
+        instructions = Self.instructions(for: facts.first?.period ?? .lastSevenDays)
         session = LanguageModelSession(
             tools: [WeeklyNumbersTool(facts: facts)],
-            instructions: Self.instructions + "\nCall getWeeklyNumbers to look up figures; it is the only source of numbers."
+            instructions: instructions + "\nCall getWeeklyNumbers to look up figures; it is the only source of numbers."
         )
     }
 
@@ -173,7 +182,7 @@ final class NumbersChat {
             // Tool calling isn't available everywhere (e.g. some simulators). The figures are
             // few, so hand the same precomputed lines over in the instructions and try again.
             usesTool = false
-            session = LanguageModelSession(instructions: Self.instructions + "\nThe only figures you have:\n"
+            session = LanguageModelSession(instructions: instructions + "\nThe only figures you have:\n"
                 + facts.map(InsightWriter.promptLine).joined(separator: "\n"))
             return try await session.respond(to: prompt, generating: GeneratedAnswer.self).content
         }
@@ -183,10 +192,13 @@ final class NumbersChat {
 /// Gives the model precomputed figures only. It never calculates anything itself.
 nonisolated struct WeeklyNumbersTool: Tool {
     let name = "getWeeklyNumbers"
-    let description = """
-        Looks up the organization's figures: total supporters, new joins, money raised, \
-        average gift and email open rate, for the last 7 days and the 7 days before.
-        """
+    var description: String {
+        let period = facts.first?.period ?? .lastSevenDays
+        return """
+            Looks up the organization's figures: total supporters, new joins, money raised, \
+            average gift and email open rate, for \(period.title.lowercased()) and \(period.before).
+            """
+    }
 
     @Generable
     nonisolated struct Arguments {

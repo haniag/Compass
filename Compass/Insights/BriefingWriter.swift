@@ -13,24 +13,29 @@ import FoundationModels
 import os
 
 nonisolated enum BriefingWriter {
-    static let instructions = """
-        You are a data analyst for a nonprofit. Summarize these metrics from the last 7 days \
-        into a two-sentence encouraging briefing for the Executive Director.
-        - Quote figures with digits, exactly as they are written in the metrics. Never calculate, \
-        round or estimate a new figure.
-        - Say "in the last 7 days". Never say "today", "yesterday" or "week".
-        - Be honest about anything that went down, and stay warm and encouraging.
-        - Speak to the reader as "you" and "your supporters". Never write "we", "us", "our" or "let's".
-        - Don't guess at causes and don't mention anything that isn't in the metrics.
+    /// The worked example uses the same period words as the metrics, e.g. "in the last 7 days".
+    static func instructions(for period: Fact.Period) -> String {
+        let during = period.during
+        let before = period.duringBefore
+        return """
+            You are a data analyst for a nonprofit. Summarize these metrics \
+            into a two-sentence encouraging briefing for the Executive Director.
+            - Quote figures with digits, exactly as they are written in the metrics. Never calculate, \
+            round or estimate a new figure.
+            - Say "\(during)". \(period.wordsToAvoid)
+            - Be honest about anything that went down, and stay warm and encouraging.
+            - Speak to the reader as "you" and "your supporters". Never write "we", "us", "our" or "let's".
+            - Don't guess at causes and don't mention anything that isn't in the metrics.
 
-        Example metrics:
-        New joins: 42 in the last 7 days, 30 in the 7 days before (up 40%).
-        Raised: $15,400 in the last 7 days, $14,000 in the 7 days before (up 10%).
-        Email opens: 31.0% in the last 7 days, 33.5% in the 7 days before (down 2.5 pts).
-        Example briefing: Great news: 42 people joined in the last 7 days, up 40%, and you raised \
-        $15,400, up 10%. Email opens slipped 2.5 pts to 31.0%, so your next subject line is a good \
-        place to win readers back.
-        """
+            Example metrics:
+            New joins: 42 \(during), 30 \(before) (up 40%).
+            Raised: $15,400 \(during), $14,000 \(before) (up 10%).
+            Email opens: 31.0% \(during), 33.5% \(before) (down 2.5 pts).
+            Example briefing: Great news: 42 people joined \(during), up 40%, and you raised \
+            $15,400, up 10%. Email opens slipped 2.5 pts to 31.0%, so your next subject line is a good \
+            place to win readers back.
+            """
+    }
 
     /// "Supporters: 539,479 now, 539,470 7 days ago (up 9)." One line per figure, ~150 tokens in all.
     static func prompt(for facts: [Fact]) -> String {
@@ -42,7 +47,7 @@ nonisolated enum BriefingWriter {
         guard !facts.isEmpty else { return nil }
         for attempt in 1...3 {
             guard !Task.isCancelled else { return nil }
-            let session = LanguageModelSession(instructions: instructions)
+            let session = LanguageModelSession(instructions: instructions(for: facts[0].period))
             let text: String
             do {
                 let words = try await session.respond(

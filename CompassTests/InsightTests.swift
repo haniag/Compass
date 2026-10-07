@@ -72,7 +72,7 @@ struct TemplateInsightsTests {
     @Test func aDropNeedsAttention() throws {
         let facts = [fact(.raised, 8_000, 10_000, unit: .money(currencyCode: "USD"))]  // −20%
         let insight = try #require(TemplateInsights.pulse(facts: facts))
-        #expect(insight.title == "Giving dipped over the last 7 days")
+        #expect(insight.title == "Giving dipped in the last 7 days")
         #expect(insight.severity == .attention)
         #expect(insight.explanation.contains("down 20%"))
     }
@@ -84,6 +84,23 @@ struct TemplateInsightsTests {
         #expect(insight.severity == .neutral)
         #expect(insight.suggestedAction == nil)
         #expect(insight.explanation == "Your new supporters and giving are close to the 7 days before.")
+    }
+
+    @Test func followsTheChosenPeriod() throws {
+        let joins = Fact(metric: .newJoins, unit: .count, value: 20, baseline: 10, period: .yesterday)
+        let yesterday = try #require(TemplateInsights.pulse(facts: [joins]))
+        #expect(yesterday.title == "More people joined yesterday")
+        #expect(yesterday.explanation == "20 people joined yesterday, up 100% from 10 the day before.")
+
+        let raised = Fact(metric: .raised, unit: .money(currencyCode: "USD"), value: 8_000, baseline: 10_000, period: .lastMonth)
+        let lastMonth = try #require(TemplateInsights.pulse(facts: [raised]))
+        #expect(lastMonth.title == "Giving dipped last month")
+        #expect(lastMonth.explanation == "You raised $8,000 last month, down 20% from $10,000 in the month before.")
+
+        let quiet = Fact(metric: .newJoins, unit: .count, value: 100, baseline: 98, period: .lastThirtyDays)
+        let steady = try #require(TemplateInsights.pulse(facts: [quiet]))
+        #expect(steady.title == "A steady 30 days")
+        #expect(steady.explanation == "Your new supporters are close to the 30 days before.")
     }
 
     @Test func nothingToSayWithoutWeeklyFacts() {

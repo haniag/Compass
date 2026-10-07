@@ -17,7 +17,9 @@ nonisolated enum FigureCheck {
             .split { !$0.isLetter && !$0.isNumber && $0 != "'" }
             .map(String.init)
         let words = Set(tokens)
-        guard words.isDisjoint(with: bannedWords) else { return false }
+        // "yesterday" is the right word only when the figures are for yesterday.
+        let banned = facts.first?.period == .yesterday ? bannedWords.subtracting(["yesterday"]) : bannedWords
+        guard words.isDisjoint(with: banned) else { return false }
 
         // "half" and "doubled" are figures too: fine only when the app shows that change.
         if !words.isDisjoint(with: halfWords), !facts.contains(where: { $0.changed(.down, by: "50%") }) {
@@ -38,10 +40,12 @@ nonisolated enum FigureCheck {
         return Set(numbers(in: text) + spelled).isSubset(of: allowedNumbers(facts))
     }
 
-    /// Every figure the app shows for these facts, plus the 7 in "last 7 days".
+    /// Every figure the app shows for these facts, plus the 7 in "last 7 days"
+    /// (or the 30 in "last 30 days").
     static func allowedNumbers(_ facts: [Fact]) -> Set<Decimal> {
-        var allowed: Set<Decimal> = [7]
+        var allowed: Set<Decimal> = []
         for fact in facts {
+            allowed.formUnion(numbers(in: "\(fact.period.during) \(fact.period.before)"))
             for text in [fact.formattedValue, fact.formattedBaseline, fact.change?.text].compactMap({ $0 }) {
                 allowed.formUnion(numbers(in: text))
             }
@@ -59,7 +63,7 @@ nonisolated enum FigureCheck {
     private static let bannedWords: Set<String> = [
         // Speaking as the organization.
         "we", "we're", "we've", "we'll", "us", "our", "ours", "let's",
-        // The figures cover the last 7 days, not a day or a calendar week.
+        // The figures cover the chosen period, never today or a calendar week.
         "today", "yesterday", "tonight", "week", "weeks", "week's", "weekly",
         // Amounts in words the check can't match to a figure.
         "triple", "tripled", "third", "thirds", "quarter", "quarters",

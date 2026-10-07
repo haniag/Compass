@@ -69,7 +69,7 @@ struct InsightWhySheet: View {
         let percent = Int(InsightRules.minimumScore)
         let points = (InsightRules.minimumScore / InsightRules.pointsToPercent)
             .formatted(.number.precision(.fractionLength(0...1)))
-        let base = "Compass compares the 7 complete days ending yesterday with the 7 days before those."
+        let base = facts.first?.period.method ?? Fact.Period.lastSevenDays.method
         if insight.severity == .neutral {
             return "\(base) None of these moved by \(percent)% or more (\(points) points for email opens), so they count as steady."
         }
@@ -102,10 +102,10 @@ private struct FactRow: View {
                 }
             }
             HStack(alignment: .firstTextBaseline) {
-                figure(fact.formattedValue, label: fact.metric == .supporters ? "Now" : "Last 7 days")
+                figure(fact.formattedValue, label: fact.metric == .supporters ? "Now" : fact.period.title)
                 Spacer()
                 if let baseline = fact.formattedBaseline {
-                    figure(baseline, label: fact.metric == .supporters ? "7 days ago" : "The 7 days before")
+                    figure(baseline, label: (fact.metric == .supporters ? fact.period.spanAgo : fact.period.before).capitalizedFirst)
                 }
             }
         }

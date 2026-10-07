@@ -73,6 +73,80 @@ nonisolated struct FactChange: Hashable, Sendable {
     }
 }
 
+/// How each period is written in sentences, labels and prompts. Never "this week" or "last week".
+nonisolated extension Fact.Period {
+    /// "Last 7 days": the picker and tile label.
+    var title: String {
+        switch self {
+        case .yesterday: "Yesterday"
+        case .lastSevenDays: "Last 7 days"
+        case .lastThirtyDays: "Last 30 days"
+        case .lastMonth: "Last month"
+        }
+    }
+
+    /// "in the last 7 days", inside a sentence: "386 people joined in the last 7 days".
+    var during: String {
+        switch self {
+        case .yesterday: "yesterday"
+        case .lastSevenDays: "in the last 7 days"
+        case .lastThirtyDays: "in the last 30 days"
+        case .lastMonth: "last month"
+        }
+    }
+
+    /// "the 7 days before": what the period is compared with.
+    var before: String {
+        switch self {
+        case .yesterday: "the day before"
+        case .lastSevenDays: "the 7 days before"
+        case .lastThirtyDays: "the 30 days before"
+        case .lastMonth: "the month before"
+        }
+    }
+
+    /// "in the 7 days before", inside a sentence: "up 13% from 342 in the 7 days before".
+    var duringBefore: String {
+        self == .yesterday ? before : "in \(before)"
+    }
+
+    /// "7 days": how far back the supporter count is compared ("in the last 7 days").
+    var span: String {
+        switch self {
+        case .yesterday: "day"
+        case .lastSevenDays: "7 days"
+        case .lastThirtyDays: "30 days"
+        case .lastMonth: "month"
+        }
+    }
+
+    /// "7 days ago": when the supporter count it's compared with was taken.
+    var spanAgo: String {
+        switch self {
+        case .yesterday: "a day ago"
+        case .lastSevenDays: "7 days ago"
+        case .lastThirtyDays: "30 days ago"
+        case .lastMonth: "a month ago"
+        }
+    }
+
+    /// For AI instructions: "Never say "today", "yesterday" or "week"." Yesterday's figures
+    /// may say "yesterday"; FigureCheck enforces the same list.
+    var wordsToAvoid: String {
+        self == .yesterday ? "Never say \"today\" or \"week\"." : "Never say \"today\", \"yesterday\" or \"week\"."
+    }
+
+    /// How Compass compares, for the "Why?" sheet.
+    var method: String {
+        switch self {
+        case .yesterday: "Compass compares yesterday with the day before."
+        case .lastSevenDays: "Compass compares the 7 complete days ending yesterday with the 7 days before those."
+        case .lastThirtyDays: "Compass compares the 30 complete days ending yesterday with the 30 days before those."
+        case .lastMonth: "Compass compares last calendar month with the month before it."
+        }
+    }
+}
+
 nonisolated extension Fact {
     /// "New joins": the tile and chip label.
     var displayName: String {
@@ -91,8 +165,8 @@ nonisolated extension Fact {
         guard let formattedBaseline else {
             return "\(displayName): \(formattedValue)."
         }
-        let period = metric == .supporters ? "now" : "in the last 7 days"
-        let before = metric == .supporters ? "7 days ago" : "in the 7 days before"
+        let period = metric == .supporters ? "now" : self.period.during
+        let before = metric == .supporters ? self.period.spanAgo : self.period.duringBefore
         let change = change.map { " (\($0.direction == .flat ? "no change" : $0.phrase))" } ?? ""
         return "\(displayName): \(formattedValue) \(period), \(formattedBaseline) \(before)\(change)."
     }

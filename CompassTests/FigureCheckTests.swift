@@ -57,4 +57,16 @@ struct FigureCheckTests {
     @Test func weekStillFailsEvenWhenTheFigureIsRight() {
         #expect(!passes("Four new supporters joined in the last week.", joinsHalved))
     }
+
+    @Test func periodWordsFollowTheFacts() {
+        let yesterday = Fact(metric: .newJoins, unit: .count, value: 20, baseline: 10, period: .yesterday)
+        let thirty = Fact(metric: .newJoins, unit: .count, value: 20, baseline: 10, period: .lastThirtyDays)
+        // "yesterday" is right for yesterday's figures only.
+        #expect(passes("20 people joined yesterday.", yesterday))
+        #expect(!passes("20 people joined yesterday.", fact(.newJoins, 20, 10)))
+        #expect(!passes("20 people joined today.", yesterday))
+        // The 30 in "last 30 days" isn't a made-up figure, but 7 is when the period is 30 days.
+        #expect(passes("20 people joined in the last 30 days.", thirty))
+        #expect(!passes("20 people joined in the last 7 days.", thirty))
+    }
 }
