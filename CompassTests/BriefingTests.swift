@@ -23,7 +23,7 @@ private let facts = [
 
 struct BriefingCheckTests {
     @Test func readsFiguresAsWritten() {
-        #expect(BriefingCheck.numbers(in: "$23,480 and 38.2%, up 13%.") == [23_480, Decimal(string: "38.2")!, 13])
+        #expect(FigureCheck.numbers(in: "$23,480 and 38.2%, up 13%.") == [23_480, Decimal(string: "38.2")!, 13])
     }
 
     @Test func allowsTheAppsOwnFigures() {

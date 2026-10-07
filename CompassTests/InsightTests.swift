@@ -196,10 +196,18 @@ struct InsightCheckTests {
         #expect(mixed.first?.factIDs == ["newJoins.lastSevenDays"])
     }
 
-    @Test func draftsWithNumbersAreDropped() {
+    @Test func draftsMayQuoteTheirFactsFigures() {
+        #expect(InsightCheck.validated([draft(title: "New joins rose 13%")], facts: [joinsUp]).count == 1)
+        let quoted = "386 people joined in the last 7 days, up from 342 in the 7 days before."
+        #expect(InsightCheck.validated([draft(explanation: quoted)], facts: [joinsUp]).count == 1)
+    }
+
+    @Test func draftsWithOtherNumbersAreDropped() {
+        // 386 − 342 = 44: true, but worked out by the model.
         #expect(InsightCheck.validated([draft(explanation: "You gained 44 more supporters.")], facts: [joinsUp]).isEmpty)
-        #expect(InsightCheck.validated([draft(title: "Joins up 13%")], facts: [joinsUp]).isEmpty)
         #expect(InsightCheck.validated([draft(action: "Email them within 2 days.")], facts: [joinsUp]).isEmpty)
+        // A figure from another fact, attached to this one.
+        #expect(InsightCheck.validated([draft(explanation: "You raised $8,000.")], facts: [joinsUp, givingDown]).isEmpty)
     }
 
     @Test func draftsMentioningWeeksAreDropped() {

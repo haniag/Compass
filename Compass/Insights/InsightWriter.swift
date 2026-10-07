@@ -41,13 +41,20 @@ nonisolated enum InsightWriter {
         the numbers; you only put one fact into words.
         - Speak to the reader as "you" and "your supporters". Never write "we", "us", "our" or "let's".
         - Use plain, warm, specific words: supporters, gifts, appeals, actions.
-        - Never write digits, amounts or percentages. The app shows the figures next to your words.
+        - You may quote the fact's figures, with digits, exactly as they are written in the fact. \
+        Never calculate, round or estimate a new figure, and never use "half", "twice" or "percent".
+        - Say "in the last 7 days" or "the 7 days before". Never say "today", "yesterday" or "week".
         - Say only what the fact shows: whether it went up or down, and why that matters. \
         Don't praise or mention anything else (appeals, emails, campaigns), don't guess at causes, \
         and don't compare with other organizations.
-        - Don't mention dates or time periods at all, and don't restate amounts in words \
-        (no "half" or "twice"); the app shows the figures and dates next to your words.
         - Keep the next step out of the explanation; it goes only in the suggested action.
+
+        An example of the style only, about a figure the app doesn't track; never copy its words:
+        Fact: Event registrations: 64 in the last 7 days, 80 in the 7 days before (down 20%). This needs attention.
+        title: Event registrations slipped 20%
+        explanation: 64 people registered in the last 7 days, down from 80 in the 7 days before. \
+        Fewer registrations now can mean a quieter room on the day.
+        suggestedAction: Remind past attendees that the event is coming up.
         """
 
     /// Up to one draft per fact InsightRules picked, in the same order. Each fact gets its own
@@ -56,8 +63,8 @@ nonisolated enum InsightWriter {
     static func drafts(about highlights: [Fact]) async throws -> [InsightDraft] {
         var drafts: [InsightDraft] = []
         for fact in highlights {
-            // One retry if the words break the copy rules; after that the template is used.
-            for attempt in 1...2 {
+            // Two retries if the words break the copy rules; after that the template is used.
+            for attempt in 1...3 {
                 try Task.checkCancellation()
                 let draft: InsightDraft
                 do {
@@ -74,7 +81,7 @@ nonisolated enum InsightWriter {
                 if !passed {
                     log.notice("Draft for \(fact.id, privacy: .public) broke the copy rules (attempt \(attempt)): \(draft.title, privacy: .public) | \(draft.explanation, privacy: .public) | \(draft.suggestedAction ?? "", privacy: .public)")
                 }
-                if passed || attempt == 2 {
+                if passed || attempt == 3 {
                     drafts.append(draft)
                     break
                 }
@@ -201,9 +208,9 @@ nonisolated struct WeeklyNumbersTool: Tool {
 
 @Generable
 nonisolated struct GeneratedInsight {
-    @Guide(description: "A short headline saying what changed, at most eight words, with no numbers")
+    @Guide(description: "A short headline saying what changed, at most eight words")
     var title: String
-    @Guide(description: "One or two sentences on what changed and why it matters to the reader, with no numbers")
+    @Guide(description: "One or two sentences on what changed and why it matters to the reader, quoting figures exactly as written in the fact")
     var explanation: String
     @Guide(description: "One practical next step the reader can take in the next few days, with no numbers")
     var suggestedAction: String

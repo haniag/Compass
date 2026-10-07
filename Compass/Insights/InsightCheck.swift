@@ -3,8 +3,9 @@
 //  Compass
 //
 //  Checks what the on-device model wrote before it reaches the screen. The model
-//  only words things: anything that cites an unknown fact, contains a number,
-//  speaks as "we", or disagrees with the direction of the figures is dropped.
+//  only words things: anything that cites an unknown fact, quotes a number that
+//  isn't one of its fact's figures, speaks as "we", or disagrees with the
+//  direction of the figures is dropped.
 //
 
 import Foundation
@@ -36,9 +37,11 @@ nonisolated enum InsightCheck {
             let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let explanation = draft.explanation.trimmingCharacters(in: .whitespacesAndNewlines)
             let action = draft.suggestedAction?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let citedFacts = cited.compactMap { id in facts.first { $0.id == id } }
+            // Figures are allowed, but only this insight's own, as the app shows them.
             guard !title.isEmpty, !explanation.isEmpty,
-                  isSafeCopy(title), isSafeCopy(explanation), isSafeCopy(action ?? ""),
-                  severity(draft.severity, agreesWith: cited.compactMap { id in facts.first { $0.id == id } })
+                  [title, explanation, action ?? ""].allSatisfy({ FigureCheck.quotesOnlyFigures(of: citedFacts, in: $0) }),
+                  severity(draft.severity, agreesWith: citedFacts)
             else { return nil }
 
             return Insight(
@@ -79,6 +82,7 @@ nonisolated enum InsightCheck {
 
     // MARK: Rules
 
+    /// For "Ask about your numbers" answers, which may not contain figures at all.
     /// Words the model may not use:
     /// - no digits or amounts in words ("half", "twice"): figures come from facts;
     /// - no "week": the app compares the last 7 days with the 7 days before and says so itself;
