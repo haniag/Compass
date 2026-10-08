@@ -17,3 +17,6 @@ PromptLab/.build/
 
 # macOS
 .DS_Store
+
+# Claude
+CLAUDE.md
