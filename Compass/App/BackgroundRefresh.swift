@@ -52,6 +52,7 @@ enum BackgroundRefresh {
         async let pulseDone: Void = pulse.refresh(in: context)
         async let emailDone: Void = email.refresh(in: context)
         _ = await (pulseDone, emailDone)
+        await Alerts.check(email: email, client: ENClient(credentials: credentials), in: context)
         log.info("Background refresh finished. Pulse updated: \(!pulse.refreshFailed, privacy: .public)")
     }
 }

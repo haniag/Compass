@@ -44,6 +44,7 @@ struct ContentView: View {
         #if DEBUG
         DebugDefaultPages.reset()
         #endif
+        Alerts.reset()
         hasFinishedOnboarding = false
         credentials = nil
     }

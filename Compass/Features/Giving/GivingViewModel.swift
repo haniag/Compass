@@ -66,7 +66,7 @@ final class GivingViewModel {
     /// Don't re-fetch on every visit; pull to refresh is always available.
     private static let staleAfter: TimeInterval = 30 * 60
     /// "Since the campaign began": EN needs a start date, and accepts one this early.
-    private static let campaignStart = DateComponents(calendar: .current, year: 2000, month: 1, day: 1).date ?? .distantPast
+    static let campaignStart = DateComponents(calendar: .current, year: 2000, month: 1, day: 1).date ?? .distantPast
     /// Days in the daily-total chart, today included.
     static let chartDays = 14
 

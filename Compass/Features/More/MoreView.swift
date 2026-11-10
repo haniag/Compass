@@ -13,6 +13,8 @@ struct MoreView: View {
     let onDisconnect: () -> Void
 
     @Query(sort: \FollowedPage.name) private var followed: [FollowedPage]
+    @AppStorage(Alerts.enabledKey) private var alertsEnabled = false
+    @State private var alertsDenied = false
     @State private var confirmingDisconnect = false
     @State private var addingPage = false
 
@@ -37,6 +39,14 @@ struct MoreView: View {
                     Text("Donation pages added by their link show up in Giving.")
                 }
                 Section {
+                    Toggle("Alerts", isOn: alertsSwitch)
+                        .tint(Color.compassTeal)
+                } footer: {
+                    Text(alertsDenied
+                         ? "Notifications are turned off for Compass. Turn them on in the Settings app, under Notifications › Compass, then try again."
+                         : "Get a notification when unsubscribes climb or a donation page reaches its goal. Compass checks about once a day; nothing leaves this iPhone.")
+                }
+                Section {
                     Button("Disconnect", role: .destructive) {
                         confirmingDisconnect = true
                     }
@@ -54,6 +64,23 @@ struct MoreView: View {
             }
             .sheet(isPresented: $addingPage) {
                 AddDonationPageSheet(credentials: credentials)
+            }
+        }
+    }
+
+    /// Turning alerts on asks iOS for permission first; a "no" leaves the switch off.
+    private var alertsSwitch: Binding<Bool> {
+        Binding {
+            alertsEnabled
+        } set: { wantsAlerts in
+            guard wantsAlerts else {
+                alertsEnabled = false
+                return
+            }
+            Task {
+                let allowed = await Alerts.requestPermission()
+                alertsEnabled = allowed
+                alertsDenied = !allowed
             }
         }
     }
