@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import SwiftData
 
 @Observable
 final class EmailViewModel {
@@ -58,12 +59,20 @@ final class EmailViewModel {
 
     // MARK: Loading
 
-    func refreshIfStale() async {
-        if let lastUpdated, Date.now.timeIntervalSince(lastUpdated) < Self.staleAfter { return }
-        await refresh()
+    /// Where the last sends are kept on the device, so Email opens with numbers.
+    private static let savedKey = "email.sends"
+
+    func refreshIfStale(in context: ModelContext) async {
+        if !hasLoaded, let saved = SavedNumbers.load([ENBroadcast].self, key: Self.savedKey, in: context) {
+            show(saved.value, asOf: saved.savedAt)
+        }
+        // Numbers from an earlier day are stale however recent: the 30 days moved on.
+        if let lastUpdated, Date.now.timeIntervalSince(lastUpdated) < Self.staleAfter,
+           Calendar.current.isDateInToday(lastUpdated) { return }
+        await refresh(in: context)
     }
 
-    func refresh() async {
+    func refresh(in context: ModelContext) async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -81,6 +90,13 @@ final class EmailViewModel {
             return
         }
 
+        show(sends, asOf: now)
+        errorMessage = nil
+        SavedNumbers.save(sends, as: Self.savedKey, at: now, in: context)
+    }
+
+    /// Works out everything on screen from `sends` (newest first), as things stood at `now`.
+    private func show(_ sends: [ENBroadcast], asOf now: Date) {
         let period = DayRange.last(Self.windowDays, daysBefore: now)
         self.period = period
         rates = EmailStats.rates(sends, in: period)
@@ -92,6 +108,5 @@ final class EmailViewModel {
         fatigue = EmailStats.listFatigue(sends)
         lastUpdated = now
         hasLoaded = true
-        errorMessage = nil
     }
 }

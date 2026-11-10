@@ -9,6 +9,7 @@
 
 import Foundation
 import Observation
+import SwiftData
 
 @Observable
 final class GivingViewModel {
@@ -46,7 +47,7 @@ final class GivingViewModel {
         var id: Int { pageId }
     }
 
-    struct Numbers: Hashable {
+    nonisolated struct Numbers: Hashable, Codable {
         let current: GivingStats.Summary
         /// The same number of days just before. Nil for the whole campaign.
         let previous: GivingStats.Summary?
@@ -111,7 +112,7 @@ final class GivingViewModel {
 
     // MARK: Loading
 
-    func load(force: Bool = false) async {
+    func load(force: Bool = false, in context: ModelContext) async {
         guard let page = selectedPage else {
             numbers = nil
             recentGifts = nil
@@ -120,6 +121,7 @@ final class GivingViewModel {
         }
         let key = Key(pageId: page.pageId, window: window)
         let now = Date.now
+        restoreSaved(key, in: context)
         let cached = numbersCache[key]
         let needsNumbers = force || cached.map { now.timeIntervalSince($0.fetchedAt) >= Self.staleAfter } ?? true
 
@@ -134,6 +136,7 @@ final class GivingViewModel {
             let result = await fetchNumbers(pageId: page.pageId, window: key.window, now: now)
             if case .success(let fresh) = result {
                 numbersCache[key] = (fresh, now)
+                SavedNumbers.save(fresh, as: Self.numbersKey(key), at: now, in: context)
             }
             if isStillShowing(key) {
                 switch result {
@@ -148,11 +151,33 @@ final class GivingViewModel {
         if isStillShowing(key) { isLoading = false }
         // After the headline numbers, so its 14 calls don't hold them up.
         await refreshDailyIfStale(pageId: page.pageId, force: force, now: now)
+        if let daily = dailyCache[page.pageId], let fetchedAt = dailyFetchedAt[page.pageId] {
+            SavedNumbers.save(daily, as: Self.dailyKey(page.pageId), at: fetchedAt, in: context)
+        }
         await giftsDone
         guard isStillShowing(key) else { return }
         isLoading = false
         recentGifts = giftsCache[page.campaignId]?.gifts
         dailyTotals = cachedDailyTotals(pageId: page.pageId, now: now)
+    }
+
+    // MARK: Saved on the device
+
+    private static func numbersKey(_ key: Key) -> String { "giving.numbers.\(key.pageId).\(key.window.rawValue)" }
+    private static func dailyKey(_ pageId: Int) -> String { "giving.daily.\(pageId)" }
+
+    /// The first time a page or window is shown, starts from what was saved on the device.
+    /// Donors are never saved (personal data), so that card waits for the network.
+    private func restoreSaved(_ key: Key, in context: ModelContext) {
+        if numbersCache[key] == nil,
+           let saved = SavedNumbers.load(Numbers.self, key: Self.numbersKey(key), in: context) {
+            numbersCache[key] = (saved.value, saved.savedAt)
+        }
+        if dailyCache[key.pageId] == nil,
+           let saved = SavedNumbers.load([Date: Decimal].self, key: Self.dailyKey(key.pageId), in: context) {
+            dailyCache[key.pageId] = saved.value
+            dailyFetchedAt[key.pageId] = saved.savedAt
+        }
     }
 
     /// False when the user picked another page or window meanwhile (that load takes over).
@@ -188,7 +213,12 @@ final class GivingViewModel {
         let yesterday = days.dropLast().last ?? now
         let known = dailyCache[pageId] ?? [:]
         let recentIsStale = force || dailyFetchedAt[pageId].map { now.timeIntervalSince($0) >= Self.staleAfter } ?? true
-        let toFetch = days.filter { known[$0] == nil || ($0 >= yesterday && recentIsStale) }
+        // Days that weren't over (or only just over) when last fetched get fetched again.
+        // That can reach further back than yesterday when the totals were saved days ago.
+        let recheckFrom = dailyFetchedAt[pageId].map { fetchedAt in
+            min(yesterday, calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: fetchedAt)) ?? yesterday)
+        } ?? yesterday
+        let toFetch = days.filter { known[$0] == nil || ($0 >= recheckFrom && recentIsStale) }
         guard !toFetch.isEmpty else { return }
 
         let currency = AccountSettings.reportingCurrency

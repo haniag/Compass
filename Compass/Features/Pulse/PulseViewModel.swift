@@ -45,6 +45,15 @@ final class PulseViewModel {
     private let client: ENClient
     private var briefingFacts: [Fact]?
 
+    /// What's kept on the device for each period, so Pulse opens with numbers.
+    private nonisolated struct Saved: Codable {
+        let range: DayRange
+        let supporters: Fact?
+        let facts: [Fact]
+    }
+
+    private static func savedKey(_ period: Fact.Period) -> String { "pulse.\(period.rawValue)" }
+
     init(credentials: ENCredentials) {
         self.credentials = credentials
         client = ENClient(credentials: credentials)
@@ -67,8 +76,12 @@ final class PulseViewModel {
     // MARK: Loading
 
     func refreshIfStale(in context: ModelContext) async {
+        if !hasData || shownPeriod != selectedPeriod {
+            restore(selectedPeriod, in: context)
+        }
+        // Numbers from an earlier day are stale however recent: the days they cover moved on.
         if let lastUpdated, Date.now.timeIntervalSince(lastUpdated) < Self.staleAfter,
-           shownPeriod == selectedPeriod { return }
+           Calendar.current.isDateInToday(lastUpdated), shownPeriod == selectedPeriod { return }
         await refresh(in: context)
     }
 
@@ -81,8 +94,26 @@ final class PulseViewModel {
         var loading: Fact.Period
         repeat {
             loading = selectedPeriod
+            // Show what was saved for this period while the fresh numbers load.
+            if shownPeriod != loading {
+                restore(loading, in: context)
+            }
             guard await load(loading, in: context) else { return }
         } while loading != selectedPeriod
+    }
+
+    /// Puts the numbers saved for `chosen` on screen. Does nothing when none were saved.
+    private func restore(_ chosen: Fact.Period, in context: ModelContext) {
+        guard let saved = SavedNumbers.load(Saved.self, key: Self.savedKey(chosen), in: context) else { return }
+        let history = SupporterSnapshot.recent(weeks: Self.trendWeeks, before: saved.savedAt, in: context)
+            .map { SupporterTrend.Point(date: $0.takenAt, count: $0.count) }
+        shownPeriod = chosen
+        period = saved.value.range
+        supporters = saved.value.supporters
+        supporterTrend = SupporterTrend.weekly(history, weeks: Self.trendWeeks, now: saved.savedAt)
+        weeklyFacts = saved.value.facts
+        topInsight = TemplateInsights.pulse(facts: saved.value.facts)
+        lastUpdated = saved.savedAt
     }
 
     /// False when nothing came back at all; the numbers already on screen stay.
@@ -143,6 +174,8 @@ final class PulseViewModel {
         topInsight = TemplateInsights.pulse(facts: facts)
         lastUpdated = now
         refreshFailed = false
+        SavedNumbers.save(Saved(range: current, supporters: supporters, facts: facts),
+                          as: Self.savedKey(chosen), at: now, in: context)
         return true
     }
 

@@ -14,6 +14,6 @@ struct CompassApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [FollowedPage.self, SupporterSnapshot.self])
+        .modelContainer(for: [FollowedPage.self, SupporterSnapshot.self, SavedNumbers.self])
     }
 }

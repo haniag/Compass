@@ -8,8 +8,8 @@
 
 import Foundation
 
-nonisolated struct Fact: Identifiable, Hashable, Sendable {
-    enum Metric: String, Hashable, Sendable {
+nonisolated struct Fact: Identifiable, Hashable, Sendable, Codable {
+    enum Metric: String, Hashable, Sendable, Codable {
         case supporters
         case newJoins
         case raised
@@ -17,7 +17,7 @@ nonisolated struct Fact: Identifiable, Hashable, Sendable {
         case emailOpenRate
     }
 
-    enum Unit: Hashable, Sendable {
+    enum Unit: Hashable, Sendable, Codable {
         case count
         case money(currencyCode: String)
         /// A rate already in percent (38.2 means 38.2%). Changes are shown in points.
@@ -26,7 +26,7 @@ nonisolated struct Fact: Identifiable, Hashable, Sendable {
 
     /// The time period Pulse shows, picked by the user. Days are complete days, so
     /// today is never included.
-    enum Period: String, CaseIterable, Identifiable, Hashable, Sendable {
+    enum Period: String, CaseIterable, Identifiable, Hashable, Sendable, Codable {
         /// Yesterday vs the day before.
         case yesterday
         /// Last 7 days vs the 7 days before.

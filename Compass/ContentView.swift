@@ -39,6 +39,7 @@ struct ContentView: View {
         CredentialStore.delete()
         try? modelContext.delete(model: FollowedPage.self)
         try? modelContext.delete(model: SupporterSnapshot.self)
+        try? modelContext.delete(model: SavedNumbers.self)
         try? modelContext.save()
         #if DEBUG
         DebugDefaultPages.reset()
@@ -50,5 +51,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [FollowedPage.self, SupporterSnapshot.self], inMemory: true)
+        .modelContainer(for: [FollowedPage.self, SupporterSnapshot.self, SavedNumbers.self], inMemory: true)
 }

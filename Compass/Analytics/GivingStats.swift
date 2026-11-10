@@ -9,7 +9,7 @@
 import Foundation
 
 nonisolated enum GivingStats {
-    struct Summary: Hashable, Sendable {
+    struct Summary: Hashable, Sendable, Codable {
         let currency: String
         let raised: Decimal
         /// All gifts, in every currency.
@@ -49,7 +49,7 @@ nonisolated enum GivingStats {
     }
 
     /// One bar of the daily-total chart: what a page raised on one day, in the reporting currency.
-    struct DailyTotal: Hashable, Sendable {
+    struct DailyTotal: Hashable, Sendable, Codable {
         /// Start of the day, in the user's calendar.
         let day: Date
         let raised: Decimal

@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated struct ENBroadcast: Identifiable, Hashable, Sendable {
+nonisolated struct ENBroadcast: Identifiable, Hashable, Sendable, Codable {
     let id: Int
     let name: String
     /// Start of the send day. EN gives the day only (DD/MM/YYYY), no time.

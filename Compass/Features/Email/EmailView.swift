@@ -6,11 +6,13 @@
 //
 
 import Charts
+import SwiftData
 import SwiftUI
 
 struct EmailView: View {
     let model: EmailViewModel
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
@@ -45,8 +47,8 @@ struct EmailView: View {
         }
         .background(Color.compassBackground)
         .foregroundStyle(Color.compassText)
-        .refreshable { await model.refresh() }
-        .task { await model.refreshIfStale() }
+        .refreshable { await model.refresh(in: modelContext) }
+        .task { await model.refreshIfStale(in: modelContext) }
     }
 
     // MARK: Header and banners
@@ -212,6 +214,7 @@ private struct SendRow: View {
     let send: ENBroadcast
     let hasHighUnsubscribes: Bool
 
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {

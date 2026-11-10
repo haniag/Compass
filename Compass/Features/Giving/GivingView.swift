@@ -14,6 +14,7 @@ struct GivingView: View {
     let credentials: ENCredentials
 
     @Query(sort: \FollowedPage.name) private var followed: [FollowedPage]
+    @Environment(\.modelContext) private var modelContext
     @State private var addingPage = false
     @ScaledMetric(relativeTo: .largeTitle) private var heroNumberSize: CGFloat = 40
 
@@ -57,9 +58,9 @@ struct GivingView: View {
         }
         .background(Color.compassBackground)
         .foregroundStyle(Color.compassText)
-        .refreshable { await model.load(force: true) }
+        .refreshable { await model.load(force: true, in: modelContext) }
         .onChange(of: pages, initial: true) { model.update(pages: pages) }
-        .task(id: model.loadKey) { await model.load() }
+        .task(id: model.loadKey) { await model.load(in: modelContext) }
         .sheet(isPresented: $addingPage) {
             AddDonationPageSheet(credentials: credentials) { pageId in
                 model.selectedPageId = pageId

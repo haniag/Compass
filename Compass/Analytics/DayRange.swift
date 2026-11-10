@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated struct DayRange: Hashable, Sendable {
+nonisolated struct DayRange: Hashable, Sendable, Codable {
     /// Start of the first day.
     let firstDay: Date
     /// Start of the last day (inclusive).
