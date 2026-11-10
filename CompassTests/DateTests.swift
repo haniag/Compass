@@ -185,3 +185,17 @@ struct PeriodTests {
         #expect(baseline(.lastSevenDays) == 470)
     }
 }
+
+struct BackgroundRefreshTests {
+    @Test func wakesAtSixTheSameDayWhenItIsEarlier() {
+        let calendar = TestDates.utc
+        let now = TestDates.date(2026, 11, 10, 2)
+        #expect(BackgroundRefresh.nextWakeUp(after: now, calendar: calendar) == TestDates.date(2026, 11, 10, 6))
+    }
+
+    @Test func wakesAtSixTheNextDayWhenItIsLater() {
+        let calendar = TestDates.utc
+        let now = TestDates.date(2026, 11, 10, 14)
+        #expect(BackgroundRefresh.nextWakeUp(after: now, calendar: calendar) == TestDates.date(2026, 11, 11, 6))
+    }
+}

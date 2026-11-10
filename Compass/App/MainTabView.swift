@@ -5,6 +5,7 @@
 //  The app after onboarding: five tabs, as in the design comps.
 //
 
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -16,6 +17,8 @@ struct MainTabView: View {
         case pulse, insights, giving, email, more
     }
 
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selection: AppTab = .pulse
     /// Loaded once and shared: Insights is written from the same numbers Pulse shows.
     @State private var pulse: PulseViewModel
@@ -59,6 +62,12 @@ struct MainTabView: View {
             }
         }
         .tint(Color.compassTeal)
+        .onChange(of: scenePhase) {
+            // Back in the app (maybe a day later): pick up newer numbers if these are old.
+            if scenePhase == .active {
+                Task { await pulse.refreshIfStale(in: modelContext) }
+            }
+        }
     }
 
     private func tabLabel(_ title: String, systemImage: String, for tab: AppTab) -> some View {

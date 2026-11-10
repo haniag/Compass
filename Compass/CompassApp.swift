@@ -10,10 +10,21 @@ import SwiftUI
 
 @main
 struct CompassApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [FollowedPage.self, SupporterSnapshot.self, SavedNumbers.self])
+        .modelContainer(CompassStore.container)
+        .onChange(of: scenePhase) {
+            // Leaving the app: ask iOS to wake Compass tomorrow morning to refresh.
+            if scenePhase == .background {
+                BackgroundRefresh.schedule()
+            }
+        }
+        .backgroundTask(.appRefresh(BackgroundRefresh.taskIdentifier)) {
+            await BackgroundRefresh.run()
+        }
     }
 }
