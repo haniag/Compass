@@ -183,6 +183,7 @@ final class PulseViewModel {
         refreshFailed = false
         SavedNumbers.save(Saved(range: current, supporters: supporters, facts: facts),
                           as: Self.savedKey(chosen), at: now, in: context)
+        WidgetSnapshot.publish(WidgetSnapshot(period: chosen, facts: allFacts, updatedAt: now))
         return true
     }
 

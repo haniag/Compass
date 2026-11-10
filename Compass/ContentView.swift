@@ -68,6 +68,7 @@ struct ContentView: View {
         DebugDefaultPages.reset()
         #endif
         Alerts.reset()
+        WidgetSnapshot.publish(nil)
         hasFinishedOnboarding = false
         credentials = nil
     }

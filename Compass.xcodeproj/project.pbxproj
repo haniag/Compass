@@ -6,6 +6,12 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		37C2D55030A3694B00742952 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37C2D54F30A3694B00742952 /* WidgetKit.framework */; };
+		37C2D55230A3694B00742952 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37C2D55130A3694B00742952 /* SwiftUI.framework */; };
+		37C2D56130A3694C00742952 /* CompassWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 37C2D54D30A3694B00742952 /* CompassWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		37094104306599770087BB33 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,12 +27,35 @@
 			remoteGlobalIDString = 37093F88306457D60087BB33;
 			remoteInfo = Compass;
 		};
+		37C2D55F30A3694C00742952 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 37093F81306457D60087BB33 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 37C2D54C30A3694B00742952;
+			remoteInfo = CompassWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		37C2D56230A3694C00742952 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				37C2D56130A3694C00742952 /* CompassWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		37093F89306457D60087BB33 /* Compass.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Compass.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37094100306599770087BB33 /* CompassUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CompassUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3709410F30659BAD0087BB33 /* CompassTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CompassTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		37C2D54D30A3694B00742952 /* CompassWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CompassWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		37C2D54F30A3694B00742952 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		37C2D55130A3694B00742952 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		37C2D56830A3697800742952 /* CompassWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CompassWidgetExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,6 +65,13 @@
 				Info.plist,
 			);
 			target = 37093F88306457D60087BB33 /* Compass */;
+		};
+		37C2D56630A3694C00742952 /* Exceptions for "CompassWidget" folder in "CompassWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 37C2D54C30A3694B00742952 /* CompassWidgetExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -58,6 +94,14 @@
 			path = CompassUITests;
 			sourceTree = "<group>";
 		};
+		37C2D55330A3694B00742952 /* CompassWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				37C2D56630A3694C00742952 /* Exceptions for "CompassWidget" folder in "CompassWidgetExtension" target */,
+			);
+			path = CompassWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,15 +120,25 @@
 			files = (
 			);
 		};
+		37C2D54A30A3694B00742952 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+				37C2D55230A3694B00742952 /* SwiftUI.framework in Frameworks */,
+				37C2D55030A3694B00742952 /* WidgetKit.framework in Frameworks */,
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		37093F80306457D60087BB33 = {
 			isa = PBXGroup;
 			children = (
+				37C2D56830A3697800742952 /* CompassWidgetExtension.entitlements */,
 				37093F8B306457D60087BB33 /* Compass */,
 				3709411030659BAD0087BB33 /* CompassTests */,
 				37C2D4A030A3500000742952 /* CompassUITests */,
+				37C2D55330A3694B00742952 /* CompassWidget */,
+				37C2D54E30A3694B00742952 /* Frameworks */,
 				37093F8A306457D60087BB33 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -95,8 +149,18 @@
 				37093F89306457D60087BB33 /* Compass.app */,
 				37094100306599770087BB33 /* CompassUITests.xctest */,
 				3709410F30659BAD0087BB33 /* CompassTests.xctest */,
+				37C2D54D30A3694B00742952 /* CompassWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		37C2D54E30A3694B00742952 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				37C2D54F30A3694B00742952 /* WidgetKit.framework */,
+				37C2D55130A3694B00742952 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -109,8 +173,12 @@
 				37093F85306457D60087BB33 /* Sources */,
 				37093F86306457D60087BB33 /* Frameworks */,
 				37093F87306457D60087BB33 /* Resources */,
+				37C2D56230A3694C00742952 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
+			);
+			dependencies = (
+				37C2D56030A3694C00742952 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				37093F8B306457D60087BB33 /* Compass */,
@@ -162,6 +230,24 @@
 			productReference = 3709410F30659BAD0087BB33 /* CompassTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		37C2D54C30A3694B00742952 /* CompassWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 37C2D56530A3694C00742952 /* Build configuration list for PBXNativeTarget "CompassWidgetExtension" */;
+			buildPhases = (
+				37C2D54930A3694B00742952 /* Sources */,
+				37C2D54A30A3694B00742952 /* Frameworks */,
+				37C2D54B30A3694B00742952 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				37C2D55330A3694B00742952 /* CompassWidget */,
+			);
+			name = CompassWidgetExtension;
+			productName = CompassWidgetExtension;
+			productReference = 37C2D54D30A3694B00742952 /* CompassWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -169,7 +255,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2700;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					37093F88306457D60087BB33 = {
@@ -182,6 +268,9 @@
 					3709410E30659BAD0087BB33 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 37093F88306457D60087BB33;
+					};
+					37C2D54C30A3694B00742952 = {
+						CreatedOnToolsVersion = 27.2;
 					};
 				};
 			};
@@ -202,6 +291,7 @@
 				37093F88306457D60087BB33 /* Compass */,
 				370940FF306599770087BB33 /* CompassUITests */,
 				3709410E30659BAD0087BB33 /* CompassTests */,
+				37C2D54C30A3694B00742952 /* CompassWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -218,6 +308,11 @@
 			);
 		};
 		3709410D30659BAD0087BB33 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		37C2D54B30A3694B00742952 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -240,6 +335,11 @@
 			files = (
 			);
 		};
+		37C2D54930A3694B00742952 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -252,6 +352,11 @@
 			isa = PBXTargetDependency;
 			target = 37093F88306457D60087BB33 /* Compass */;
 			targetProxy = 3709411330659BAD0087BB33 /* PBXContainerItemProxy */;
+		};
+		37C2D56030A3694C00742952 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 37C2D54C30A3694B00742952 /* CompassWidgetExtension */;
+			targetProxy = 37C2D55F30A3694C00742952 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -382,6 +487,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Compass/Compass.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6GBM8GTKU5;
@@ -401,6 +507,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fursa.Compass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -420,6 +527,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Compass/Compass.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6GBM8GTKU5;
@@ -439,6 +547,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fursa.Compass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -535,6 +644,72 @@
 			};
 			name = Release;
 		};
+		37C2D56330A3694C00742952 /* Debug configuration for PBXNativeTarget "CompassWidgetExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = CompassWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6GBM8GTKU5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CompassWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Compass;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fursa.Compass.CompassWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		37C2D56430A3694C00742952 /* Release configuration for PBXNativeTarget "CompassWidgetExtension" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = CompassWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6GBM8GTKU5;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CompassWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Compass;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fursa.Compass.CompassWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -567,6 +742,14 @@
 			buildConfigurations = (
 				3709411630659BAD0087BB33 /* Debug configuration for PBXNativeTarget "CompassTests" */,
 				3709411730659BAD0087BB33 /* Release configuration for PBXNativeTarget "CompassTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		37C2D56530A3694C00742952 /* Build configuration list for PBXNativeTarget "CompassWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				37C2D56330A3694C00742952 /* Debug configuration for PBXNativeTarget "CompassWidgetExtension" */,
+				37C2D56430A3694C00742952 /* Release configuration for PBXNativeTarget "CompassWidgetExtension" */,
 			);
 			defaultConfigurationName = Release;
 		};

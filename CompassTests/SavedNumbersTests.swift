@@ -53,3 +53,18 @@ struct SavedNumbersTests {
         #expect(SavedNumbers.load([Date: Decimal].self, key: "giving.daily.1", in: context)?.value == totals)
     }
 }
+
+struct WidgetSnapshotTests {
+    @Test func carriesEachNumberAsTextWithItsChange() {
+        let facts = [
+            PulseFacts.supporters(now: 48_312, before: 48_098, period: .lastSevenDays),
+            Fact(metric: .emailOpenRate, unit: .percent, value: 38.2, baseline: 39.6, period: .lastSevenDays),
+            PulseFacts.supporters(now: 10, before: nil, period: .lastSevenDays),
+        ]
+        let snapshot = WidgetSnapshot(period: .lastSevenDays, facts: facts, updatedAt: .now)
+        #expect(snapshot.periodTitle == "Last 7 days")
+        #expect(snapshot.items[0] == .init(title: "Supporters", value: "48,312", change: "▲ 214", isGood: true))
+        #expect(snapshot.items[1] == .init(title: "Email opens", value: "38.2%", change: "▼ 1.4 pts", isGood: false))
+        #expect(snapshot.items[2].change == nil)
+    }
+}
