@@ -62,6 +62,9 @@ struct GivingView: View {
                     if let gifts = model.recentGifts, !gifts.isEmpty {
                         donorsCard(gifts)
                     }
+                    if let overview = model.overview {
+                        allPagesCard(overview)
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -362,6 +365,72 @@ struct GivingView: View {
                 Divider()
                     .overlay(Color.compassDivider)
                 Text("and \(gifts.count - Self.donorsShown) more")
+                    .font(.footnote)
+                    .foregroundStyle(Color.compassSecondaryText)
+                    .frame(minHeight: 40)
+            }
+        }
+        .padding(.bottom, -8)
+        .compassCard()
+    }
+
+    // MARK: All pages
+
+    /// Every followed donation page for the time span picked. Tapping one shows it above.
+    private func allPagesCard(_ overview: GivingViewModel.Overview) -> some View {
+        let span = overview.window.days.map { "Last \($0) days" } ?? "Since each began"
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("All pages")
+                    .font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Text(span)
+                    .font(.footnote)
+                    .foregroundStyle(Color.compassSecondaryText)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(money(overview.total))
+                    .font(.system(.title, design: .rounded, weight: .semibold))
+                Text("Raised by \(overview.pages.count) pages together")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.compassSecondaryText)
+            }
+            .padding(.vertical, 8)
+            .accessibilityElement(children: .combine)
+            ForEach(overview.pages) { page in
+                let isShown = page.pageId == model.selectedPage?.pageId
+                Divider()
+                    .overlay(Color.compassDivider)
+                Button {
+                    model.selectedPageId = page.pageId
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(page.name)
+                            .font(.subheadline.weight(isShown ? .semibold : .regular))
+                            .multilineTextAlignment(.leading)
+                        if isShown {
+                            Image(systemName: "checkmark")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Color.compassTeal)
+                                .accessibilityHidden(true)
+                        }
+                        Spacer()
+                        Text(money(page.raised))
+                            .font(.system(.body, design: .rounded, weight: .semibold))
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(page.name), \(money(page.raised))")
+                .accessibilityHint(isShown ? "Shown above" : "Shows this page above")
+                .accessibilityAddTraits(isShown ? .isSelected : [])
+            }
+            if pages.count > GivingViewModel.maxOverviewPages {
+                Divider()
+                    .overlay(Color.compassDivider)
+                Text("Showing your first \(GivingViewModel.maxOverviewPages) pages")
                     .font(.footnote)
                     .foregroundStyle(Color.compassSecondaryText)
                     .frame(minHeight: 40)

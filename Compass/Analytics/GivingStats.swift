@@ -62,6 +62,24 @@ nonisolated enum GivingStats {
         }
     }
 
+    /// What one page raised, for the list of all followed pages.
+    struct PageTotal: Hashable, Sendable, Identifiable {
+        let pageId: Int
+        let name: String
+        let raised: Decimal
+
+        var id: Int { pageId }
+    }
+
+    /// Biggest first; pages that raised the same are in name order.
+    static func ranked(_ pages: [PageTotal]) -> [PageTotal] {
+        pages.sorted { ($0.raised, $1.name) > ($1.raised, $0.name) }
+    }
+
+    static func combined(_ pages: [PageTotal]) -> Decimal {
+        pages.reduce(0) { $0 + $1.raised }
+    }
+
     /// "▲ 8%" for raised against the window before. Nil when nothing came in before.
     static func change(_ current: Summary, from previous: Summary) -> FactChange? {
         FactChange.percent(from: previous.raised, to: current.raised, higherIsBetter: true)

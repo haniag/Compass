@@ -85,3 +85,20 @@ struct GivingStatsTests {
         #expect(GivingStats.bestDay([]) == nil)
     }
 }
+
+struct GivingOverviewTests {
+    private let pages = [
+        GivingStats.PageTotal(pageId: 1, name: "Monthly giving", raised: 500),
+        GivingStats.PageTotal(pageId: 2, name: "Fall Appeal", raised: 2_400.50),
+        GivingStats.PageTotal(pageId: 3, name: "Gala tickets", raised: 500),
+    ]
+
+    @Test func biggestFirstThenByName() {
+        #expect(GivingStats.ranked(pages).map(\.name) == ["Fall Appeal", "Gala tickets", "Monthly giving"])
+    }
+
+    @Test func combinedAddsEveryPage() {
+        #expect(GivingStats.combined(pages) == 3_400.50)
+        #expect(GivingStats.combined([]) == 0)
+    }
+}

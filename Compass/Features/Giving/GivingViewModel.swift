@@ -63,6 +63,17 @@ final class GivingViewModel {
         let previous: GivingStats.Summary?
     }
 
+    /// Every followed donation page side by side, for the time span picked.
+    struct Overview: Hashable {
+        let window: Window
+        /// Biggest first.
+        let pages: [GivingStats.PageTotal]
+        let total: Decimal
+    }
+
+    /// The overview asks EN about each page, so it stops at this many.
+    static let maxOverviewPages = 12
+
     /// Don't re-fetch on every visit; pull to refresh is always available.
     private static let staleAfter: TimeInterval = 30 * 60
     /// "Since the campaign began": EN needs a start date, and accepts one this early.
@@ -80,6 +91,8 @@ final class GivingViewModel {
     private(set) var dailyTotals: [GivingStats.DailyTotal]?
     /// Nil while loading, when the page has no goal, or when EN couldn't be asked.
     private(set) var goalFigures: GoalFigures?
+    /// Nil with fewer than two pages, or until every page's number is known.
+    private(set) var overview: Overview?
     private(set) var isLoading = false
     /// Why the last load failed, in plain words. Nil when it worked.
     private(set) var errorMessage: String?
@@ -130,12 +143,14 @@ final class GivingViewModel {
             recentGifts = nil
             dailyTotals = nil
             goalFigures = nil
+            overview = nil
             return
         }
         let key = Key(pageId: page.pageId, window: window)
         let now = Date.now
         restoreSaved(key, in: context)
         goalFigures = page.hasGoal ? cachedGoalFigures(pageId: page.pageId, in: context) : nil
+        overview = cachedOverview(window: key.window, in: context)
         let cached = numbersCache[key]
         let needsNumbers = force || cached.map { now.timeIntervalSince($0.fetchedAt) >= Self.staleAfter } ?? true
 
@@ -179,6 +194,11 @@ final class GivingViewModel {
         isLoading = false
         recentGifts = giftsCache[page.campaignId]?.gifts
         dailyTotals = cachedDailyTotals(pageId: page.pageId, now: now)
+
+        // Last: the other pages' numbers, which nothing above waits for.
+        await refreshOverview(window: key.window, force: force, now: now, in: context)
+        guard isStillShowing(key) else { return }
+        overview = cachedOverview(window: key.window, in: context)
     }
 
     // MARK: Saved on the device
@@ -198,6 +218,54 @@ final class GivingViewModel {
             dailyCache[key.pageId] = saved.value
             dailyFetchedAt[key.pageId] = saved.savedAt
         }
+    }
+
+    // MARK: All pages
+
+    private var overviewPages: [Page] {
+        pages.count >= 2 ? Array(pages.prefix(Self.maxOverviewPages)) : []
+    }
+
+    private func refreshOverview(window: Window, force: Bool, now: Date, in context: ModelContext) async {
+        let stale = overviewPages.map { Key(pageId: $0.pageId, window: window) }.filter { key in
+            restoreSaved(key, in: context)
+            guard !force, let cached = numbersCache[key] else { return true }
+            return now.timeIntervalSince(cached.fetchedAt) >= Self.staleAfter
+        }
+        guard !stale.isEmpty else { return }
+        // Together; ENClient keeps it to 4 requests at a time.
+        let fetched = await withTaskGroup(of: (Key, Numbers?).self) { group in
+            for key in stale {
+                group.addTask { @MainActor in
+                    let result = await self.fetchNumbers(pageId: key.pageId, window: key.window, now: now)
+                    return (key, try? result.get())
+                }
+            }
+            var results: [Key: Numbers] = [:]
+            for await (key, numbers) in group {
+                // A failure keeps what was there.
+                if let numbers { results[key] = numbers }
+            }
+            return results
+        }
+        for (key, numbers) in fetched {
+            numbersCache[key] = (numbers, now)
+            SavedNumbers.save(numbers, as: Self.numbersKey(key), at: now, in: context)
+        }
+    }
+
+    /// Nil unless every page's number is known: a total that leaves pages out would mislead.
+    private func cachedOverview(window: Window, in context: ModelContext) -> Overview? {
+        let listed = overviewPages
+        guard !listed.isEmpty else { return nil }
+        var totals: [GivingStats.PageTotal] = []
+        for page in listed {
+            let key = Key(pageId: page.pageId, window: window)
+            restoreSaved(key, in: context)
+            guard let cached = numbersCache[key] else { return nil }
+            totals.append(GivingStats.PageTotal(pageId: page.pageId, name: page.name, raised: cached.numbers.current.raised))
+        }
+        return Overview(window: window, pages: GivingStats.ranked(totals), total: GivingStats.combined(totals))
     }
 
     // MARK: Goal
