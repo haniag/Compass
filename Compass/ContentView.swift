@@ -9,13 +9,13 @@ import SwiftData
 import SwiftUI
 
 struct ContentView: View {
-    @State private var credentials: ENCredentials? = CredentialStore.load()
+    @State private var credentials: ENCredentials? = ContentView.startingCredentials
     @AppStorage("hasFinishedOnboarding") private var hasFinishedOnboarding = false
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         Group {
-            if let credentials, hasFinishedOnboarding {
+            if let credentials, hasFinishedOnboarding || Self.isUITestDemo {
                 MainTabView(credentials: credentials, onDisconnect: disconnect)
             } else {
                 OnboardingFlow(credentials: $credentials) {
@@ -28,14 +28,37 @@ struct ContentView: View {
         .preferredColorScheme(.light)
         #if DEBUG
         .task(id: credentials) {
-            if let credentials {
+            if Self.isUITestDemo {
+                DebugUITestDemo.seedPages(in: modelContext)
+            } else if let credentials {
                 await DebugDefaultPages.followIfNeeded(credentials: credentials, in: modelContext)
             }
         }
         #endif
     }
 
+    /// DEBUG builds launched with "-uiTestDemo" (the UI smoke test). Always false otherwise.
+    private static var isUITestDemo: Bool {
+        #if DEBUG
+        DebugUITestDemo.isOn
+        #else
+        false
+        #endif
+    }
+
+    private static var startingCredentials: ENCredentials? {
+        #if DEBUG
+        if DebugUITestDemo.isOn { return DebugUITestDemo.credentials }
+        #endif
+        return CredentialStore.load()
+    }
+
     private func disconnect() {
+        // The UI test's demo never touched the Keychain or saved settings; leave them alone.
+        guard !Self.isUITestDemo else {
+            credentials = nil
+            return
+        }
         CredentialStore.delete()
         try? modelContext.delete(model: FollowedPage.self)
         try? modelContext.delete(model: SupporterSnapshot.self)

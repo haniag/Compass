@@ -53,6 +53,11 @@
 			path = CompassTests;
 			sourceTree = "<group>";
 		};
+		37C2D4A030A3500000742952 /* CompassUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CompassUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +84,7 @@
 			children = (
 				37093F8B306457D60087BB33 /* Compass */,
 				3709411030659BAD0087BB33 /* CompassTests */,
+				37C2D4A030A3500000742952 /* CompassUITests */,
 				37093F8A306457D60087BB33 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -126,6 +132,9 @@
 			);
 			dependencies = (
 				37094105306599770087BB33 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				37C2D4A030A3500000742952 /* CompassUITests */,
 			);
 			name = CompassUITests;
 			productName = CompassUITests;
