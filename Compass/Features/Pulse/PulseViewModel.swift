@@ -73,6 +73,13 @@ final class PulseViewModel {
         return "\(period.label) · Updated \(time)"
     }
 
+    /// The numbers on screen as plain text, for the Share button. Nil with nothing to share.
+    var shareText: String? {
+        guard hasData else { return nil }
+        let headline = briefing ?? topInsight.map { "\($0.title)\n\($0.explanation)" }
+        return PulseSummary.text(period: shownPeriod, range: period, headline: headline, facts: allFacts)
+    }
+
     // MARK: Loading
 
     func refreshIfStale(in context: ModelContext) async {

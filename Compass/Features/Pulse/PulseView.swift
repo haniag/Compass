@@ -79,6 +79,17 @@ struct PulseView: View {
                     .accessibilityAddTraits(.isHeader)
             }
             Spacer()
+            if let summary = model.shareText {
+                ShareLink(item: summary) {
+                    Image(systemName: "square.and.arrow.up")
+                        .fontWeight(.medium)
+                        .frame(width: 44, height: 44)
+                        .background(Color.compassCard, in: .circle)
+                        .shadow(color: Color.compassText.opacity(0.08), radius: 1, y: 1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share these numbers")
+            }
             Button {
                 Task { await model.refresh(in: modelContext) }
             } label: {

@@ -292,3 +292,27 @@ struct PromptLineTests {
         #expect(InsightWriter.promptLine(demoFacts[3]).hasSuffix("(down 1.4 pts). This needs attention."))
     }
 }
+
+struct PulseSummaryTests {
+    private let range = DayRange.lastSevenDays(before: TestDates.date(2026, 11, 10, 9), calendar: TestDates.utc)
+
+    @Test func listsEachNumberWithItsChange() {
+        let facts = [
+            PulseFacts.supporters(now: 48_312, before: 48_098, period: .lastSevenDays),
+            PulseFacts.newJoins(current: 386, previous: 342, period: .lastSevenDays),
+        ]
+        let text = PulseSummary.text(period: .lastSevenDays, range: range, headline: "More people joined.", facts: facts)
+        let lines = text.components(separatedBy: "\n")
+        #expect(lines.first?.hasPrefix("How we did: last 7 days (") == true)
+        #expect(lines.contains("More people joined."))
+        #expect(lines.contains("• Supporters: 48,312 (▲ 214 vs 7 days ago)"))
+        #expect(lines.contains("• New joins: 386 (▲ 13% vs the 7 days before)"))
+    }
+
+    @Test func leavesOutTheChangeWhenThereIsNothingToCompare() {
+        let facts = [PulseFacts.supporters(now: 48_312, before: nil, period: .yesterday)]
+        let text = PulseSummary.text(period: .yesterday, range: range, headline: nil, facts: facts)
+        #expect(text.hasSuffix("• Supporters: 48,312"))
+        #expect(!text.contains("\n\n\n"))
+    }
+}
