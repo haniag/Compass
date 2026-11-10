@@ -16,13 +16,23 @@ struct GivingView: View {
     @Query(sort: \FollowedPage.name) private var followed: [FollowedPage]
     @Environment(\.modelContext) private var modelContext
     @State private var addingPage = false
+    @State private var editingGoal = false
     @ScaledMetric(relativeTo: .largeTitle) private var heroNumberSize: CGFloat = 40
 
     /// Followed pages that have a page link; only those can show giving.
     private var pages: [GivingViewModel.Page] {
         followed.compactMap { page in
-            page.pageId.map { GivingViewModel.Page(pageId: $0, campaignId: page.campaignId, name: page.name) }
+            page.pageId.map {
+                GivingViewModel.Page(pageId: $0, campaignId: page.campaignId, name: page.name,
+                                     hasGoal: page.goalAmount != nil)
+            }
         }
+    }
+
+    /// The saved entry for the page on screen: it holds the goal.
+    private var selectedFollowed: FollowedPage? {
+        guard let pageId = model.selectedPage?.pageId else { return nil }
+        return followed.first { $0.pageId == pageId }
     }
 
     var body: some View {
@@ -38,6 +48,7 @@ struct GivingView: View {
                     }
                     if let numbers = model.numbers {
                         raisedCard(numbers)
+                        goalSection
                         if let days = model.dailyTotals {
                             dailyCard(days)
                         }
@@ -61,6 +72,11 @@ struct GivingView: View {
         .refreshable { await model.load(force: true, in: modelContext) }
         .onChange(of: pages, initial: true) { model.update(pages: pages) }
         .task(id: model.loadKey) { await model.load(in: modelContext) }
+        .sheet(isPresented: $editingGoal) {
+            if let page = selectedFollowed {
+                GoalSheet(page: page)
+            }
+        }
         .sheet(isPresented: $addingPage) {
             AddDonationPageSheet(credentials: credentials) { pageId in
                 model.selectedPageId = pageId
@@ -160,6 +176,32 @@ struct GivingView: View {
         }
         .compassCard()
         .accessibilityElement(children: .combine)
+    }
+
+    // MARK: Goal
+
+    @ViewBuilder
+    private var goalSection: some View {
+        if let page = selectedFollowed {
+            if let goal = page.goalAmount {
+                // Waits for the campaign total and the last 7 days; shows nothing until then.
+                if let figures = model.goalFigures {
+                    GoalCard(pace: GoalPace(goal: goal, raised: figures.raised, recentRaised: figures.recentRaised,
+                                            deadline: page.goalDeadline, now: .now),
+                             deadline: page.goalDeadline) { editingGoal = true }
+                }
+            } else {
+                Button {
+                    editingGoal = true
+                } label: {
+                    Label("Set a goal for this page", systemImage: "flag")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.compassTeal)
+                        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                }
+                .compassCard()
+            }
+        }
     }
 
     /// "2,278 gifts · average $81", "No gifts yet".

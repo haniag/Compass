@@ -43,8 +43,18 @@ final class GivingViewModel {
         let pageId: Int
         let campaignId: Int
         let name: String
+        /// True when the user set a goal: Giving then also loads what the goal card needs.
+        var hasGoal = false
 
         var id: Int { pageId }
+    }
+
+    /// What the goal card is worked out from, whatever time span is picked.
+    struct GoalFigures: Hashable {
+        /// Raised since the campaign began.
+        let raised: Decimal
+        /// Raised over the last 7 complete days.
+        let recentRaised: Decimal
     }
 
     nonisolated struct Numbers: Hashable, Codable {
@@ -68,6 +78,8 @@ final class GivingViewModel {
     private(set) var recentGifts: [ENRecentGift]?
     /// Oldest first, today last. Nil until every day has loaded, or when one failed.
     private(set) var dailyTotals: [GivingStats.DailyTotal]?
+    /// Nil while loading, when the page has no goal, or when EN couldn't be asked.
+    private(set) var goalFigures: GoalFigures?
     private(set) var isLoading = false
     /// Why the last load failed, in plain words. Nil when it worked.
     private(set) var errorMessage: String?
@@ -96,7 +108,7 @@ final class GivingViewModel {
     }
 
     /// What to load; the view reloads whenever it changes.
-    var loadKey: String { "\(selectedPage?.pageId ?? 0)-\(window.rawValue)" }
+    var loadKey: String { "\(selectedPage?.pageId ?? 0)-\(window.rawValue)-\(selectedPage?.hasGoal ?? false)" }
 
     /// "Raised so far", "Raised in the last 30 days".
     var raisedTitle: String {
@@ -117,11 +129,13 @@ final class GivingViewModel {
             numbers = nil
             recentGifts = nil
             dailyTotals = nil
+            goalFigures = nil
             return
         }
         let key = Key(pageId: page.pageId, window: window)
         let now = Date.now
         restoreSaved(key, in: context)
+        goalFigures = page.hasGoal ? cachedGoalFigures(pageId: page.pageId, in: context) : nil
         let cached = numbersCache[key]
         let needsNumbers = force || cached.map { now.timeIntervalSince($0.fetchedAt) >= Self.staleAfter } ?? true
 
@@ -149,6 +163,12 @@ final class GivingViewModel {
             }
         }
         if isStillShowing(key) { isLoading = false }
+        if page.hasGoal {
+            await refreshGoalNumbers(pageId: page.pageId, force: force, now: now, in: context)
+            if isStillShowing(key) {
+                goalFigures = cachedGoalFigures(pageId: page.pageId, in: context)
+            }
+        }
         // After the headline numbers, so its 14 calls don't hold them up.
         await refreshDailyIfStale(pageId: page.pageId, force: force, now: now)
         if let daily = dailyCache[page.pageId], let fetchedAt = dailyFetchedAt[page.pageId] {
@@ -178,6 +198,34 @@ final class GivingViewModel {
             dailyCache[key.pageId] = saved.value
             dailyFetchedAt[key.pageId] = saved.savedAt
         }
+    }
+
+    // MARK: Goal
+
+    /// The goal card needs the campaign total and the last 7 days, whichever span is picked.
+    private static let goalWindows: [Window] = [.campaign, .lastSevenDays]
+
+    private func refreshGoalNumbers(pageId: Int, force: Bool, now: Date, in context: ModelContext) async {
+        for window in Self.goalWindows {
+            let key = Key(pageId: pageId, window: window)
+            restoreSaved(key, in: context)
+            if !force, let cached = numbersCache[key], now.timeIntervalSince(cached.fetchedAt) < Self.staleAfter { continue }
+            // A failure keeps what was there; the card then shows the older figures.
+            if case .success(let fresh) = await fetchNumbers(pageId: pageId, window: window, now: now) {
+                numbersCache[key] = (fresh, now)
+                SavedNumbers.save(fresh, as: Self.numbersKey(key), at: now, in: context)
+            }
+        }
+    }
+
+    private func cachedGoalFigures(pageId: Int, in context: ModelContext) -> GoalFigures? {
+        for window in Self.goalWindows {
+            restoreSaved(Key(pageId: pageId, window: window), in: context)
+        }
+        guard let campaign = numbersCache[Key(pageId: pageId, window: .campaign)],
+              let recent = numbersCache[Key(pageId: pageId, window: .lastSevenDays)]
+        else { return nil }
+        return GoalFigures(raised: campaign.numbers.current.raised, recentRaised: recent.numbers.current.raised)
     }
 
     /// False when the user picked another page or window meanwhile (that load takes over).

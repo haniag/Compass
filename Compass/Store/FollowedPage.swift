@@ -24,6 +24,11 @@ final class FollowedPage {
     var pageId: Int?
     /// EN's type for that page: "donation", "event"…
     var pageType: String?
+    /// The fundraising goal the user set for this page, in the reporting currency.
+    /// EN has no goals or deadlines, so both are entered in Compass.
+    var goalAmount: Decimal?
+    /// The last day to reach the goal. Nil when the goal has no deadline.
+    var goalDeadline: Date?
 
     var kind: Kind {
         get { Kind(rawValue: kindRaw) ?? .page }
