@@ -16,9 +16,17 @@ actor ENClient {
     private var activeRequests = 0
     private var waitingRequests: [CheckedContinuation<Void, Never>] = []
 
-    init(credentials: ENCredentials, session: URLSession = .shared) {
+    /// How long to wait before each new try after a failure that may pass by itself
+    /// (no connection, a timeout, EN busy). Two waits means three tries in all.
+    private let retryDelays: [Duration]
+    /// Requests under way, by URL. Two screens asking for the same thing share one request.
+    private var inFlight: [URL: Task<(Data, Int), any Error>] = [:]
+
+    init(credentials: ENCredentials, session: URLSession = .shared,
+         retryDelays: [Duration] = [.seconds(1), .seconds(3)]) {
         self.credentials = credentials
         self.session = session
+        self.retryDelays = retryDelays
     }
 
     // MARK: Services
@@ -131,25 +139,14 @@ actor ENClient {
         }
         #endif
 
-        await acquireSlot()
-        defer { releaseSlot() }
-
         var components = URLComponents()
         components.scheme = "https"
         components.host = credentials.region.host
         components.path = "/page/\(pageId)"
-        let data: Data
-        let response: URLResponse
-        do {
-            // Host is fixed and the path is a number, so this can't fail.
-            (data, response) = try await session.data(from: components.url!)
-        } catch {
-            throw .network
-        }
-        if let http = response as? HTTPURLResponse {
-            if http.statusCode == 404 { throw .pageUnavailable }
-            if !(200..<300).contains(http.statusCode) { throw .httpStatus(http.statusCode) }
-        }
+        // Host is fixed and the path is a number, so this can't fail.
+        let (data, status) = try await download(components.url!)
+        if status == 404 { throw .pageUnavailable }
+        if !(200..<300).contains(status) { throw .httpStatus(status) }
         guard let details = ENPageDetails(html: String(decoding: data, as: UTF8.self)) else { throw .pageUnavailable }
         return details
     }
@@ -157,7 +154,6 @@ actor ENClient {
     // MARK: Plumbing
 
     private func fetch(service: String, parameters: [String: String] = [:]) async throws(ENError) -> [ENRow] {
-        let data: Data
         #if DEBUG
         if credentials.isDemo {
             try? await Task.sleep(for: .milliseconds(400))
@@ -165,20 +161,59 @@ actor ENClient {
         }
         #endif
 
+        let (data, status) = try await download(makeURL(service: service, parameters: parameters))
+        if !(200..<300).contains(status) { throw .httpStatus(status) }
+        return try ENResponse.rows(from: data)
+    }
+
+    /// The body and HTTP status for `url`. If the same URL is already being fetched,
+    /// waits for that request instead of sending a second one.
+    private func download(_ url: URL) async throws(ENError) -> (Data, Int) {
+        let request: Task<(Data, Int), any Error>
+        if let running = inFlight[url] {
+            request = running
+        } else {
+            request = Task { try await self.downloadWithRetries(url) }
+            inFlight[url] = request
+        }
+        let result = await request.result
+        // Only forget our own request: a newer one for this URL may have started meanwhile.
+        if inFlight[url] == request {
+            inFlight[url] = nil
+        }
+        do {
+            return try result.get()
+        } catch {
+            throw (error as? ENError) ?? .network
+        }
+    }
+
+    /// Tries again, after a wait, when the failure may pass by itself: no connection,
+    /// a timeout, EN busy (HTTP 429) or broken (5xx). Anything else is returned as it is.
+    private func downloadWithRetries(_ url: URL) async throws(ENError) -> (Data, Int) {
+        var attempt = 0
+        while true {
+            let result = await downloadOnce(url)
+            let worthRetrying = switch result {
+            case .failure: true
+            case .success((_, let status)): status == 429 || (500..<600).contains(status)
+            }
+            guard worthRetrying, attempt < retryDelays.count,
+                  (try? await Task.sleep(for: retryDelays[attempt])) != nil
+            else { return try result.get() }
+            attempt += 1
+        }
+    }
+
+    private func downloadOnce(_ url: URL) async -> Result<(Data, Int), ENError> {
         await acquireSlot()
         defer { releaseSlot() }
-
-        let response: URLResponse
         do {
-            (data, response) = try await session.data(from: makeURL(service: service, parameters: parameters))
+            let (data, response) = try await session.data(from: url)
+            return .success((data, (response as? HTTPURLResponse)?.statusCode ?? 200))
         } catch {
-            throw .network
+            return .failure(.network)
         }
-
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw .httpStatus(http.statusCode)
-        }
-        return try ENResponse.rows(from: data)
     }
 
     private func makeURL(service: String, parameters: [String: String]) -> URL {
