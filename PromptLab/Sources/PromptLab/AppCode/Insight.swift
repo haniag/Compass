@@ -1,0 +1,1 @@
+../../../../Compass/Insights/Insight.swift

@@ -77,10 +77,25 @@ nonisolated enum InsightWriter {
         """
     }
 
+    /// One try at a briefing or a digest draft, for PromptLab's measurements. The app ignores these.
+    struct Attempt: Sendable {
+        /// The digest fact the draft is about; nil for the briefing.
+        let factID: String?
+        /// 1, 2 or 3.
+        let number: Int
+        /// What the model wrote (a draft's title, explanation and action joined with " | ").
+        let text: String?
+        /// Why the model call failed, when it did.
+        let error: String?
+        let passed: Bool
+    }
+
     /// Up to one draft per fact InsightRules picked, in the same order. Each fact gets its own
     /// short request: the on-device model is much more reliable with one thing at a time.
     /// The fact ID and severity come from Swift; the model writes only the words.
-    static func drafts(about highlights: [Fact]) async throws -> [InsightDraft] {
+    /// `onAttempt` hears about every try (PromptLab measures with it; the app doesn't use it).
+    static func drafts(about highlights: [Fact],
+                       onAttempt: (Attempt) -> Void = { _ in }) async throws -> [InsightDraft] {
         var drafts: [InsightDraft] = []
         for fact in highlights {
             // Two retries if the words break the copy rules; after that the template is used.
@@ -95,9 +110,13 @@ nonisolated enum InsightWriter {
                     // The model refused or failed on this fact (e.g. a safety check).
                     // Skip it; its template insight fills the gap.
                     log.error("Draft for \(fact.id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+                    onAttempt(Attempt(factID: fact.id, number: attempt, text: nil, error: String(describing: error), passed: false))
                     break
                 }
                 let passed = InsightCheck.validated([draft], facts: [fact]).count == 1
+                onAttempt(Attempt(factID: fact.id, number: attempt,
+                                  text: [draft.title, draft.explanation, draft.suggestedAction ?? ""].joined(separator: " | "),
+                                  error: nil, passed: passed))
                 if !passed {
                     log.notice("Draft for \(fact.id, privacy: .public) broke the copy rules (attempt \(attempt)): \(draft.title, privacy: .public) | \(draft.explanation, privacy: .public) | \(draft.suggestedAction ?? "", privacy: .public)")
                 }

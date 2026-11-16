@@ -52,7 +52,9 @@ nonisolated enum BriefingWriter {
 
     /// Nil when the model fails or breaks the rules three times; Pulse then shows its template insight.
     /// `warmedUp`, from `prewarmedSession(for:)` with the facts' period, is used for the first try.
-    static func briefing(from facts: [Fact], warmedUp: LanguageModelSession? = nil) async -> String? {
+    /// `onAttempt` hears about every try (PromptLab measures with it; the app doesn't use it).
+    static func briefing(from facts: [Fact], warmedUp: LanguageModelSession? = nil,
+                         onAttempt: (InsightWriter.Attempt) -> Void = { _ in }) async -> String? {
         guard !facts.isEmpty else { return nil }
         for attempt in 1...3 {
             guard !Task.isCancelled else { return nil }
@@ -70,9 +72,12 @@ nonisolated enum BriefingWriter {
                     .joined(separator: " ")
             } catch {
                 InsightWriter.log.error("Briefing failed: \(String(describing: error), privacy: .public)")
+                onAttempt(.init(factID: nil, number: attempt, text: nil, error: String(describing: error), passed: false))
                 return nil
             }
-            if BriefingCheck.isSafe(text, facts: facts) { return text }
+            let passed = BriefingCheck.isSafe(text, facts: facts)
+            onAttempt(.init(factID: nil, number: attempt, text: text, error: nil, passed: passed))
+            if passed { return text }
             InsightWriter.log.notice("Briefing broke the rules (attempt \(attempt)): \(text, privacy: .public)")
         }
         return nil

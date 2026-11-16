@@ -2,7 +2,8 @@
 //  main.swift
 //  PromptLab
 //
-//  Runs the bounce-rate experiment and saves a report to PromptLab/Results/.
+//  Runs the bounce-rate experiment (default) or, with --pass-rates, the app's briefing
+//  and digest pass-rate measurement, and saves a report to PromptLab/Results/.
 //  Arguments: which variants to run (e.g. "CD"; default all), and --runs=N (default 3).
 //
 
@@ -17,6 +18,13 @@ let model = SystemLanguageModel.default
 guard case .available = model.availability else {
     print("Apple Intelligence isn't available on this Mac: \(model.availability)")
     exit(1)
+}
+
+// --pass-rates: how often the app's briefing and digest drafts pass its checks (PassRates.swift).
+if arguments.contains("--pass-rates") {
+    let label = arguments.first { $0.hasPrefix("--label=") }.map { String($0.dropFirst(8)) } ?? "run"
+    try await PassRates.run(runs: arguments.contains { $0.hasPrefix("--runs=") } ? runs : 4, label: label)
+    exit(0)
 }
 
 let variants = BounceRate.variants.filter { only == nil || only!.contains($0.id) }

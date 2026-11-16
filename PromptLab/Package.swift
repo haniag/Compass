@@ -15,6 +15,10 @@ let package = Package(
     name: "PromptLab",
     platforms: [.macOS("26.4")],
     targets: [
-        .executableTarget(name: "PromptLab", swiftSettings: [.swiftLanguageMode(.v5)]),
+        .executableTarget(name: "PromptLab", swiftSettings: [
+            .swiftLanguageMode(.v5),
+            // The app's files in AppCode/ (symlinks into Compass/) use /regex/ literals, as Xcode allows.
+            .enableUpcomingFeature("BareSlashRegexLiterals"),
+        ]),
     ]
 )
