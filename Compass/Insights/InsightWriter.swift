@@ -160,8 +160,8 @@ final class NumbersChat {
         self.facts = facts
         instructions = Self.instructions(for: facts.first?.period ?? .lastSevenDays)
         session = LanguageModelSession(
-            tools: [WeeklyNumbersTool(facts: facts)],
-            instructions: instructions + "\nCall getWeeklyNumbers to look up figures; it is the only source of numbers."
+            tools: [NumbersTool(facts: facts)],
+            instructions: instructions + "\nCall getNumbers to look up figures; it is the only source of numbers."
         )
     }
 
@@ -190,8 +190,8 @@ final class NumbersChat {
 }
 
 /// Gives the model precomputed figures only. It never calculates anything itself.
-nonisolated struct WeeklyNumbersTool: Tool {
-    let name = "getWeeklyNumbers"
+nonisolated struct NumbersTool: Tool {
+    let name = "getNumbers"
     var description: String {
         let period = facts.first?.period ?? .lastSevenDays
         return """
