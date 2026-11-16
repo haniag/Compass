@@ -75,6 +75,7 @@ struct GivingView: View {
         .refreshable { await model.load(force: true, in: modelContext) }
         .onChange(of: pages, initial: true) { model.update(pages: pages) }
         .task(id: model.loadKey) { await model.load(in: modelContext) }
+        .task(id: model.overviewFindings) { await model.writeOverviewSummary() }
         .sheet(isPresented: $editingGoal) {
             if let page = selectedFollowed {
                 GoalSheet(page: page)
@@ -398,6 +399,9 @@ struct GivingView: View {
             }
             .padding(.vertical, 8)
             .accessibilityElement(children: .combine)
+            if let findings = model.overviewFindings {
+                overviewSummary(findings)
+            }
             ForEach(overview.pages) { page in
                 let isShown = page.pageId == model.selectedPage?.pageId
                 Divider()
@@ -438,6 +442,32 @@ struct GivingView: View {
         }
         .padding(.bottom, -8)
         .compassCard()
+    }
+
+    /// Two sentences on how the pages compare and what to do next: written by Apple
+    /// Intelligence when it's on, otherwise put together from the same numbers.
+    private func overviewSummary(_ findings: GivingFindings) -> some View {
+        let writtenWithAI = model.isWritingOverviewSummary || model.overviewSummary != nil
+        return VStack(alignment: .leading, spacing: 6) {
+            Label(writtenWithAI ? "Apple Intelligence" : "On-device",
+                  systemImage: writtenWithAI ? "apple.intelligence" : "lock")
+                .font(.caption)
+                .foregroundStyle(Color.compassSecondaryText)
+            if model.isWritingOverviewSummary {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Writing your summary…")
+                        .foregroundStyle(Color.compassSecondaryText)
+                }
+            } else {
+                Text(model.overviewSummary ?? findings.template)
+            }
+        }
+        .font(.subheadline)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.compassTealTint, in: .rect(cornerRadius: 12))
+        .padding(.bottom, 10)
     }
 
     // MARK: No pages yet

@@ -20,8 +20,6 @@ nonisolated struct EmailFindings: Hashable, Sendable {
 
     /// "Best email" needs at least this many emails to choose from.
     static let minimumSendsForBest = 3
-    /// Longer names are left out: they'd crowd a two-sentence summary.
-    static let longestName = 60
 
     /// Opens, clicks and unsubscribes over the window, each against the window before. Never empty.
     let rates: [EmailRate]
@@ -76,13 +74,8 @@ nonisolated struct EmailFindings: Hashable, Sendable {
         )
     }
 
-    /// Nil when the name can't be quoted safely: empty, very long, or with quotation
-    /// marks of its own (the summary puts names inside quotation marks).
+    /// Nil when the name can't be quoted safely (see `NameCheck.quotable`).
     private static func named(_ send: ENBroadcast, rate: Decimal) -> NamedSend? {
-        let name = send.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, name.count <= longestName,
-              !name.contains(where: { "\"“”".contains($0) })
-        else { return nil }
-        return NamedSend(name: name, rate: rate)
+        NameCheck.quotable(send.name).map { NamedSend(name: $0, rate: rate) }
     }
 }

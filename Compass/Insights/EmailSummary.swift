@@ -128,22 +128,10 @@ nonisolated enum EmailSummaryCheck {
 
     static func isSafe(_ text: String, findings: EmailFindings) -> Bool {
         guard !text.isEmpty, text.split(separator: " ").count <= maxWords else { return false }
-        let name = findings.support?.name
-
-        // Anything in quotation marks must be the email's name, word for word.
-        var rest = text.replacingOccurrences(of: "“", with: "\"").replacingOccurrences(of: "”", with: "\"")
-        for match in rest.matches(of: /"([^"]*)"/) {
-            let quoted = String(match.output.1).trimmingCharacters(in: .whitespaces)
-            // American style puts the comma inside the quotation marks.
-            let withoutComma = quoted.trimmingCharacters(in: CharacterSet(charactersIn: ".,;:!?"))
-            guard let name, quoted == name || withoutComma == name else { return false }
-        }
-        // The name itself isn't checked for figures or banned words ("Weekly news · Email 3").
-        rest = rest.replacing(/"[^"]*"/, with: " ")
-        if let name {
-            rest = rest.replacingOccurrences(of: name, with: " ", options: .caseInsensitive)
-        }
-        guard !rest.contains("\"") else { return false }
+        // Anything in quotation marks must be the email's name, word for word. The name
+        // itself isn't checked for figures or banned words ("Weekly news · Email 3").
+        let names = [findings.support?.name].compactMap { $0 }
+        guard let rest = NameCheck.replacingNames(names, in: text) else { return false }
 
         return FigureCheck.quotesOnly(findings.allowedNumbers, period: EmailFindings.period,
                                       showsHalving: false,

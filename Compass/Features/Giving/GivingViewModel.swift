@@ -93,6 +93,12 @@ final class GivingViewModel {
     private(set) var goalFigures: GoalFigures?
     /// Nil with fewer than two pages, or until every page's number is known.
     private(set) var overview: Overview?
+    /// Apple Intelligence's two-sentence summary of all pages. Nil without it, or when it
+    /// broke the rules; the card then shows `overviewFindings.template`.
+    private(set) var overviewSummary: String?
+    private(set) var isWritingOverviewSummary = false
+    /// The findings `overviewSummary` was written from.
+    private var summaryFindings: GivingFindings?
     private(set) var isLoading = false
     /// Why the last load failed, in plain words. Nil when it worked.
     private(set) var errorMessage: String?
@@ -266,6 +272,31 @@ final class GivingViewModel {
             totals.append(GivingStats.PageTotal(pageId: page.pageId, name: page.name, raised: cached.numbers.current.raised))
         }
         return Overview(window: window, pages: GivingStats.ranked(totals), total: GivingStats.combined(totals))
+    }
+
+    /// What the all-pages summary talks about. Nil with one page, or when nothing was raised.
+    var overviewFindings: GivingFindings? {
+        overview.flatMap {
+            GivingFindings.make(pages: $0.pages, days: $0.window.days, currency: AccountSettings.reportingCurrency)
+        }
+    }
+
+    /// Writes the all-pages summary when its numbers change. Cheap to call again with the same numbers.
+    func writeOverviewSummary() async {
+        let findings = overviewFindings
+        guard findings != summaryFindings else { return }
+        overviewSummary = nil
+        // A cancelled earlier run may have left this on.
+        isWritingOverviewSummary = false
+        guard let findings, InsightWriter.status == .available else { return }
+
+        isWritingOverviewSummary = true
+        let text = await GivingSummaryWriter.summary(from: findings)
+        // The numbers changed again, or the screen went away; it'll be written next time.
+        guard !Task.isCancelled, findings == overviewFindings else { return }
+        overviewSummary = text
+        summaryFindings = findings
+        isWritingOverviewSummary = false
     }
 
     // MARK: Goal
