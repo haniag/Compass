@@ -99,16 +99,17 @@ struct InsightsView: View {
 
     @ViewBuilder
     private var digest: some View {
-        if model.isWriting {
-            HStack(spacing: 10) {
-                ProgressView()
-                Text("Writing your digest…")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.compassSecondaryText)
+        if !model.insights.isEmpty {
+            if model.isWriting {
+                // The cards below are the templates until Apple Intelligence rewrites each one.
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Apple Intelligence is writing your digest…")
+                        .font(.footnote)
+                        .foregroundStyle(Color.compassSecondaryText)
+                }
+                .accessibilityElement(children: .combine)
             }
-            .frame(maxWidth: .infinity, minHeight: 120)
-            .compassCard()
-        } else if !model.insights.isEmpty {
             ForEach(model.insights) { insight in
                 InsightCard(insight: insight, facts: model.facts) { whyInsight = insight }
             }

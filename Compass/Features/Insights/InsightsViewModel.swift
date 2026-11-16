@@ -66,17 +66,28 @@ final class InsightsViewModel {
             return
         }
 
+        // The template cards show at once; each fact's card is swapped for the model's
+        // words as soon as its draft passes the check. One fact per request, as before.
         isWriting = true
-        let drafts = (try? await InsightWriter.drafts(about: highlights)) ?? []
-        // A newer call took over, or the screen went away; it'll be written next time.
-        guard currentJob == job, !Task.isCancelled else { return }
-
-        let written = InsightCheck.validated(drafts, facts: highlights)
-        let steady = TemplateInsights.steadyNote(facts: newFacts, highlights: highlights)
-        insights = InsightCheck.filling(written, highlights: highlights) + [steady].compactMap { $0 }
-        author = written.isEmpty ? .templates : .appleIntelligence
+        var drafts: [InsightDraft] = []
+        show(drafts, highlights: highlights, facts: newFacts)
+        for fact in highlights {
+            drafts += (try? await InsightWriter.drafts(about: [fact])) ?? []
+            // A newer call took over, or the screen went away; it'll be written next time.
+            guard currentJob == job, !Task.isCancelled else { return }
+            show(drafts, highlights: highlights, facts: newFacts)
+        }
         writtenFrom = newFacts
         isWriting = false
+    }
+
+    /// The digest from the drafts written so far: checked drafts, templates for the
+    /// rest, then the steady note. With every draft in, this is the finished digest.
+    private func show(_ drafts: [InsightDraft], highlights: [Fact], facts: [Fact]) {
+        let written = InsightCheck.validated(drafts, facts: highlights)
+        let steady = TemplateInsights.steadyNote(facts: facts, highlights: highlights)
+        insights = InsightCheck.filling(written, highlights: highlights) + [steady].compactMap { $0 }
+        author = written.isEmpty ? .templates : .appleIntelligence
     }
 
     // MARK: Ask
