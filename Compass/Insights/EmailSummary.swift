@@ -34,7 +34,8 @@ nonisolated extension EmailFindings {
         if let fatigue {
             return Support(
                 line: "Warning: each of the last \(fatigue.sends) emails lost supporters at about \(fatigue.timesUsual) times the usual rate.",
-                nextStep: "Give your list a short break, or make a gentler ask, before the next email.",
+                // The orange banner below already suggests a break; this adds where to look.
+                nextStep: "Compare your last \(fatigue.sends) emails with earlier ones: was the ask bigger, or were they sent closer together?",
                 figures: ["\(fatigue.sends)", "\(fatigue.timesUsual)"],
                 showsDoubling: fatigue.timesUsual == 2
             )
@@ -76,16 +77,18 @@ nonisolated extension EmailFindings {
         return rates.map(Self.line) + [sent] + [support?.line].compactMap { $0 }
     }
 
-    /// "Opens: 38.2% in the last 30 days, 39.6% in the 30 days before (down 1.4 pts). This needs attention."
+    /// "Opens: 38.2% in the last 30 days, down 1.4 pts from the 30 days before. This needs attention."
+    /// The earlier rate itself is left out: the screen doesn't show it, so the summary can't quote it.
     private static func line(_ rate: EmailRate) -> String {
         let now = "\(rate.spokenTitle): \(rate.formattedValue) \(period.during)"
-        guard let baseline = rate.formattedBaseline, let change = rate.change else { return now + "." }
+        guard let change = rate.change else { return now + "." }
         let verdict = switch change.isGood {
         case true?: " This is good news."
         case false?: " This needs attention."
         case nil: ""
         }
-        return "\(now), \(baseline) \(period.duringBefore) (\(moved(change))).\(verdict)"
+        let moved = change.direction == .flat ? "the same as \(period.duringBefore)" : "\(change.phrase) from \(period.before)"
+        return "\(now), \(moved).\(verdict)"
     }
 
     private static func moved(_ change: FactChange) -> String {
@@ -110,7 +113,7 @@ nonisolated extension EmailFindings {
     var allowedNumbers: Set<Decimal> {
         var texts = ["\(Self.period.during) \(Self.period.before)", "\(sendsInPeriod)"]
         for rate in rates {
-            texts += [rate.formattedValue, rate.formattedBaseline, rate.change?.text].compactMap { $0 }
+            texts += [rate.formattedValue, rate.change?.text].compactMap { $0 }
         }
         texts += support?.figures ?? []
         return Set(texts.flatMap(FigureCheck.numbers))
@@ -146,5 +149,41 @@ nonisolated enum EmailSummaryCheck {
                                       showsHalving: false,
                                       showsDoubling: findings.support?.showsDoubling ?? false,
                                       in: rest)
+            && agreesOnDirections(rest, rates: findings.rates)
     }
+
+    /// False when the text says a rate "rose 1.6 pts" that fell 1.6 pts, or the other way
+    /// round. It looks at the part of the sentence around each change ("…, though clicks
+    /// slipped 0.4 pts to 4.9%") for a word that points the wrong way.
+    static func agreesOnDirections(_ text: String, rates: [EmailRate]) -> Bool {
+        let parts = text.lowercased()
+            .split(separator: /[.,;:!?]\s+|\s+(?:and|but|though|although|while|whereas|yet)\s+/)
+            .map(String.init)
+        let changes = rates.compactMap { rate -> (number: Decimal, isUp: Bool)? in
+            guard let change = rate.change, change.direction != .flat,
+                  let number = FigureCheck.numbers(in: change.text).first
+            else { return nil }
+            return (number, change.direction == .up)
+        }
+        for change in changes {
+            // Two rates that moved by the same amount in opposite directions can't be told apart.
+            if changes.contains(where: { $0.number == change.number && $0.isUp != change.isUp }) { continue }
+            for part in parts where FigureCheck.numbers(in: part).contains(change.number) {
+                let words = Set(part.split { !$0.isLetter }.map(String.init))
+                let right = change.isUp ? upWords : downWords
+                let wrong = change.isUp ? downWords : upWords
+                if !words.isDisjoint(with: wrong), words.isDisjoint(with: right) { return false }
+            }
+        }
+        return true
+    }
+
+    private static let upWords: Set<String> = [
+        "up", "rose", "rise", "risen", "rising", "climbed", "climbing", "grew", "grown", "growing",
+        "increased", "increase", "higher", "gained", "jumped",
+    ]
+    private static let downWords: Set<String> = [
+        "down", "fell", "fall", "fallen", "falling", "slipped", "slipping", "dropped", "drop",
+        "dropping", "declined", "decreased", "decrease", "dipped", "lower", "slid", "lost",
+    ]
 }

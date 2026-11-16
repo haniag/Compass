@@ -105,6 +105,15 @@ struct EmailSummaryCheckTests {
         #expect(!EmailSummaryCheck.isSafe("You sent 4 emails in the last 30 days.", findings: found))
     }
 
+    @Test func rejectsARateSaidToMoveTheWrongWay() throws {
+        // Opens went from 42% to 40%: down.
+        let change = try #require(found.rates[0].change)
+        #expect(change.direction == .down)
+        #expect(EmailSummaryCheck.isSafe("Opens fell \(change.text) to \(opens) in the last 30 days.", findings: found))
+        #expect(!EmailSummaryCheck.isSafe("Opens rose \(change.text) to \(opens) in the last 30 days.", findings: found))
+        #expect(!EmailSummaryCheck.isSafe("Clicks held steady, though opens were up \(change.text).", findings: found))
+    }
+
     @Test func rejectsWrongPeriodsAndSpeakingAsTheOrganization() {
         #expect(!EmailSummaryCheck.isSafe("Opens were \(opens) this week.", findings: found))
         #expect(!EmailSummaryCheck.isSafe("Opens were \(opens) this month.", findings: found))

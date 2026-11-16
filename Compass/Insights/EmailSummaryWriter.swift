@@ -16,7 +16,6 @@ nonisolated enum EmailSummaryWriter {
     static var instructions: String {
         let period = EmailFindings.period
         let during = period.during
-        let before = period.duringBefore
         return """
             You write a two-sentence summary of a nonprofit's email results for the person \
             who sends its emails. The app has already worked out the numbers; you only put \
@@ -25,19 +24,20 @@ nonisolated enum EmailSummaryWriter {
             - Second sentence: the next step you are given, in your own words.
             - Quote figures with digits, exactly as they are written in the results. Never \
             calculate, round or estimate a new figure.
+            - Say whether each rate went up or down exactly as the results say; never swap them.
             - Say "\(during)". \(period.wordsToAvoid)
             - Name an email only if the results name it; copy its name exactly, inside quotation marks.
             - Be honest about anything that went down, and stay warm and encouraging.
             - Speak to the reader as "you" and "your supporters". Never write "we", "us", "our" or "let's".
             - Don't guess at causes and don't mention anything that isn't in the results.
 
-            Example results:
-            Opens: 24.0% \(during), 22.5% \(before) (up 1.5 pts). This is good news.
-            Clicks: 2.0% \(during), 2.6% \(before) (down 0.6 pts). This needs attention.
+            An example of the style only, about rates the app doesn't track; never copy its words:
+            Replies: 2.0% \(during), down 0.6 pts from \(period.before). This needs attention.
+            Forwards: 1.5% \(during), up 0.3 pts from \(period.before). This is good news.
             Best email: “Spring update”, with a 5.0% click rate.
             Next step: See what worked in “Spring update”, your most-clicked email, and try it again.
-            Example summary: Opens rose 1.5 pts to 24.0% \(during), though clicks slipped \
-            0.6 pts to 2.0%. Take a look at what made “Spring update” land so well and bring \
+            Example summary: Replies slipped 0.6 pts to 2.0% \(during), while forwards edged \
+            up 0.3 pts to 1.5%. Take a look at what made “Spring update” land so well and bring \
             that into your next email.
             """
     }
