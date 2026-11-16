@@ -77,13 +77,16 @@ nonisolated struct GeneratedBriefing {
     var followUp: String
 }
 
-/// The briefing may quote figures, but only ones Swift worked out.
+/// The briefing may quote figures, but only ones Swift worked out, and it has to say
+/// the right way each one moved.
 nonisolated enum BriefingCheck {
     /// No more than this many words: about two sentences.
     static let maxWords = 70
 
     static func isSafe(_ text: String, facts: [Fact]) -> Bool {
         guard !text.isEmpty, text.split(separator: " ").count <= maxWords else { return false }
+        // "Opens rose 1.4 pts" when they fell is wrong even though 1.4 is a real figure.
         return FigureCheck.quotesOnlyFigures(of: facts, in: text)
+            && FigureCheck.agreesOnDirections(text, changes: facts.compactMap(\.change))
     }
 }

@@ -50,6 +50,14 @@ struct BriefingCheckTests {
         #expect(!BriefingCheck.isSafe("Eight more supporters joined your list in the last 7 days.", facts: nine))
     }
 
+    @Test func rejectsAFigureSaidToMoveTheWrongWay() {
+        // New joins went up 13%; email opens went down 1.4 pts.
+        #expect(BriefingCheck.isSafe("New joins rose 13% to 386 in the last 7 days.", facts: facts))
+        #expect(!BriefingCheck.isSafe("New joins fell 13% to 386 in the last 7 days.", facts: facts))
+        #expect(!BriefingCheck.isSafe("You raised $23,480, though email opens climbed 1.4 pts to 38.2%.", facts: facts))
+        #expect(BriefingCheck.isSafe("You raised $23,480, up 8%, while email opens slipped 1.4 pts.", facts: facts))
+    }
+
     @Test func rejectsSpeakingAsTheOrganization() {
         #expect(!BriefingCheck.isSafe("We raised $23,480 in the last 7 days.", facts: facts))
     }

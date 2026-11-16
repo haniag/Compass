@@ -51,6 +51,39 @@ nonisolated enum FigureCheck {
         return Set(numbers(in: text) + spelled).isSubset(of: allowed)
     }
 
+    /// False when the text says something "rose 13%" that fell 13%, or the other way
+    /// round. It looks at the part of the sentence around each change ("…, though clicks
+    /// slipped 0.4 pts to 4.9%") for a word that points the wrong way.
+    static func agreesOnDirections(_ text: String, changes: [FactChange]) -> Bool {
+        let parts = text.lowercased()
+            .split(separator: /[.,;:!?]\s+|\s+(?:and|but|though|although|while|whereas|yet)\s+/)
+            .map(String.init)
+        let moves = changes.compactMap { change -> (number: Decimal, isUp: Bool)? in
+            guard change.direction != .flat, let number = numbers(in: change.text).first else { return nil }
+            return (number, change.direction == .up)
+        }
+        for move in moves {
+            // Two figures that moved by the same amount in opposite directions can't be told apart.
+            if moves.contains(where: { $0.number == move.number && $0.isUp != move.isUp }) { continue }
+            for part in parts where numbers(in: part).contains(move.number) {
+                let words = Set(part.split { !$0.isLetter }.map(String.init))
+                let right = move.isUp ? upWords : downWords
+                let wrong = move.isUp ? downWords : upWords
+                if !words.isDisjoint(with: wrong), words.isDisjoint(with: right) { return false }
+            }
+        }
+        return true
+    }
+
+    private static let upWords: Set<String> = [
+        "up", "rose", "rise", "risen", "rising", "climbed", "climbing", "grew", "grown", "growing",
+        "increased", "increase", "higher", "gained", "jumped",
+    ]
+    private static let downWords: Set<String> = [
+        "down", "fell", "fall", "fallen", "falling", "slipped", "slipping", "dropped", "drop",
+        "dropping", "declined", "decreased", "decrease", "dipped", "lower", "slid", "lost",
+    ]
+
     /// Every figure the app shows for these facts, plus the 7 in "last 7 days"
     /// (or the 30 in "last 30 days").
     static func allowedNumbers(_ facts: [Fact]) -> Set<Decimal> {

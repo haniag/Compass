@@ -140,38 +140,8 @@ nonisolated enum EmailSummaryCheck {
             && agreesOnDirections(rest, rates: findings.rates)
     }
 
-    /// False when the text says a rate "rose 1.6 pts" that fell 1.6 pts, or the other way
-    /// round. It looks at the part of the sentence around each change ("…, though clicks
-    /// slipped 0.4 pts to 4.9%") for a word that points the wrong way.
+    /// False when the text says a rate "rose 1.6 pts" that fell 1.6 pts, or the other way round.
     static func agreesOnDirections(_ text: String, rates: [EmailRate]) -> Bool {
-        let parts = text.lowercased()
-            .split(separator: /[.,;:!?]\s+|\s+(?:and|but|though|although|while|whereas|yet)\s+/)
-            .map(String.init)
-        let changes = rates.compactMap { rate -> (number: Decimal, isUp: Bool)? in
-            guard let change = rate.change, change.direction != .flat,
-                  let number = FigureCheck.numbers(in: change.text).first
-            else { return nil }
-            return (number, change.direction == .up)
-        }
-        for change in changes {
-            // Two rates that moved by the same amount in opposite directions can't be told apart.
-            if changes.contains(where: { $0.number == change.number && $0.isUp != change.isUp }) { continue }
-            for part in parts where FigureCheck.numbers(in: part).contains(change.number) {
-                let words = Set(part.split { !$0.isLetter }.map(String.init))
-                let right = change.isUp ? upWords : downWords
-                let wrong = change.isUp ? downWords : upWords
-                if !words.isDisjoint(with: wrong), words.isDisjoint(with: right) { return false }
-            }
-        }
-        return true
+        FigureCheck.agreesOnDirections(text, changes: rates.compactMap(\.change))
     }
-
-    private static let upWords: Set<String> = [
-        "up", "rose", "rise", "risen", "rising", "climbed", "climbing", "grew", "grown", "growing",
-        "increased", "increase", "higher", "gained", "jumped",
-    ]
-    private static let downWords: Set<String> = [
-        "down", "fell", "fall", "fallen", "falling", "slipped", "slipping", "dropped", "drop",
-        "dropping", "declined", "decreased", "decrease", "dipped", "lower", "slid", "lost",
-    ]
 }
