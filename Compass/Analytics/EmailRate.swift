@@ -47,6 +47,9 @@ nonisolated struct EmailRate: Identifiable, Hashable, Sendable {
     /// "38.2%", or "0.24%" for rates under 1%.
     var formattedValue: String { EmailFormat.percent(value, decimals: decimals) }
 
+    /// The rate in the window before, written the same way. Nil when nothing was sent then.
+    var formattedBaseline: String? { baseline.map { EmailFormat.percent($0, decimals: decimals) } }
+
     /// "▼ 1.4 pts". Nil when there's nothing to compare with.
     var change: FactChange? {
         baseline.map { FactChange.points(from: $0, to: value, higherIsBetter: higherIsBetter, decimals: decimals) }

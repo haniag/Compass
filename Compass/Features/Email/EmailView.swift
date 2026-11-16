@@ -26,6 +26,9 @@ struct EmailView: View {
                     if model.recentSends.isEmpty {
                         noSendsCard
                     } else {
+                        if let findings = model.findings {
+                            summaryCard(findings)
+                        }
                         if !model.rates.isEmpty {
                             ratesCard
                         }
@@ -49,6 +52,7 @@ struct EmailView: View {
         .foregroundStyle(Color.compassText)
         .refreshable { await model.refresh(in: modelContext) }
         .task { await model.refreshIfStale(in: modelContext) }
+        .task(id: model.findings) { await model.writeSummary() }
     }
 
     // MARK: Header and banners
@@ -84,6 +88,55 @@ struct EmailView: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.compassOrangeTint, in: .rect(cornerRadius: 16))
+    }
+
+    // MARK: Summary
+
+    /// Two sentences on how the emails did and what to do next: written by Apple
+    /// Intelligence when it's on, otherwise put together from the same numbers.
+    private func summaryCard(_ findings: EmailFindings) -> some View {
+        let writtenWithAI = model.isWritingSummary || model.summary != nil
+        return VStack(alignment: .leading, spacing: 10) {
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    summaryTitle
+                    Spacer()
+                    summarySource(writtenWithAI: writtenWithAI)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    summaryTitle
+                    summarySource(writtenWithAI: writtenWithAI)
+                }
+            }
+            if model.isWritingSummary {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Writing your summary…")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.compassSecondaryText)
+                }
+                .frame(maxWidth: .infinity, minHeight: 60)
+            } else {
+                Text(model.summary ?? findings.template)
+                    .font(.system(.title3, design: .serif))
+            }
+        }
+        .compassCard()
+    }
+
+    private var summaryTitle: some View {
+        Label("Summary", systemImage: "sparkles")
+            .font(.footnote.weight(.semibold))
+            .textCase(.uppercase)
+            .foregroundStyle(Color.compassTeal)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func summarySource(writtenWithAI: Bool) -> some View {
+        Label(writtenWithAI ? "Apple Intelligence" : "On-device",
+              systemImage: writtenWithAI ? "apple.intelligence" : "lock")
+            .font(.caption)
+            .foregroundStyle(Color.compassSecondaryText)
     }
 
     // MARK: Rates

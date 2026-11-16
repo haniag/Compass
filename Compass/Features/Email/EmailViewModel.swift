@@ -29,11 +29,19 @@ final class EmailViewModel {
     private(set) var weekdays: [EmailStats.WeekdayRate] = []
     private(set) var bestWeekday: Int?
     private(set) var fatigue: EmailStats.Fatigue?
+    /// What the summary card talks about. Nil when nothing was sent in `period`.
+    private(set) var findings: EmailFindings?
+    /// Apple Intelligence's two-sentence summary. Nil without it, or when it broke the
+    /// rules; the card then shows `findings.template`.
+    private(set) var summary: String?
+    private(set) var isWritingSummary = false
     private(set) var hasLoaded = false
     private(set) var isRefreshing = false
     /// Why the last refresh failed, in plain words. Nil when it worked.
     private(set) var errorMessage: String?
 
+    /// The findings `summary` was written from.
+    private var summaryFindings: EmailFindings?
     private var usualUnsubscribeRate: Decimal?
     private var lastUpdated: Date?
     private let client: ENClient
@@ -106,7 +114,28 @@ final class EmailViewModel {
         bestWeekday = EmailStats.bestWeekday(weekdays)
         usualUnsubscribeRate = EmailStats.usualUnsubscribeRate(sends)
         fatigue = EmailStats.listFatigue(sends)
+        findings = EmailFindings.make(from: sends, in: period)
         lastUpdated = now
         hasLoaded = true
+    }
+
+    // MARK: Summary
+
+    /// Writes the summary when the numbers change. Cheap to call again with the same numbers.
+    func writeSummary() async {
+        let findings = self.findings
+        guard findings != summaryFindings else { return }
+        summary = nil
+        // A cancelled earlier run may have left this on.
+        isWritingSummary = false
+        guard let findings, InsightWriter.status == .available else { return }
+
+        isWritingSummary = true
+        let text = await EmailSummaryWriter.summary(from: findings)
+        // The numbers changed again, or the screen went away; it'll be written next time.
+        guard !Task.isCancelled, findings == self.findings else { return }
+        summary = text
+        summaryFindings = findings
+        isWritingSummary = false
     }
 }

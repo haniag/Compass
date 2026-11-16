@@ -12,6 +12,17 @@ nonisolated enum FigureCheck {
     /// True when every number in `text` is one of these facts' figures, and the text
     /// doesn't speak as "we", name the wrong time period, or work out amounts in words.
     static func quotesOnlyFigures(of facts: [Fact], in text: String) -> Bool {
+        quotesOnly(allowedNumbers(facts), period: facts.first?.period,
+                   showsHalving: facts.contains { $0.changed(.down, by: "50%") },
+                   showsDoubling: facts.contains { $0.changed(.up, by: "100%") },
+                   in: text)
+    }
+
+    /// The same check for figures that aren't Facts (the Email summary): `allowed` is every
+    /// number the text may quote. "half" passes only with `showsHalving`, "double" and
+    /// "twice" only with `showsDoubling`.
+    static func quotesOnly(_ allowed: Set<Decimal>, period: Fact.Period?,
+                           showsHalving: Bool, showsDoubling: Bool, in text: String) -> Bool {
         // Words and digit runs, in order: "fifty percent" → ["fifty", "percent"].
         let tokens = text.lowercased().replacingOccurrences(of: "’", with: "'")
             .split { !$0.isLetter && !$0.isNumber && $0 != "'" }
@@ -19,7 +30,6 @@ nonisolated enum FigureCheck {
         let words = Set(tokens)
         // "yesterday" and "month" are the right words only for their own period, and
         // "this month" never is: the month the figures cover is over.
-        let period = facts.first?.period
         var banned = bannedWords
         if period == .yesterday { banned.remove("yesterday") }
         if period != .lastMonth { banned.formUnion(["month", "months", "month's", "monthly"]) }
@@ -27,12 +37,8 @@ nonisolated enum FigureCheck {
         if zip(tokens, tokens.dropFirst()).contains(where: { $0 == "this" && $1 == "month" }) { return false }
 
         // "half" and "doubled" are figures too: fine only when the app shows that change.
-        if !words.isDisjoint(with: halfWords), !facts.contains(where: { $0.changed(.down, by: "50%") }) {
-            return false
-        }
-        if !words.isDisjoint(with: doubleWords), !facts.contains(where: { $0.changed(.up, by: "100%") }) {
-            return false
-        }
+        if !words.isDisjoint(with: halfWords), !showsHalving { return false }
+        if !words.isDisjoint(with: doubleWords), !showsDoubling { return false }
         // "percent" only right after a number ("fifty percent", "50 percent"), never "a few percent".
         for (index, token) in tokens.enumerated() where token == "percent" || token == "percentage" {
             guard index > 0 else { return false }
@@ -42,7 +48,7 @@ nonisolated enum FigureCheck {
 
         // "nine" is fine when 9 is one of the figures. "one" is left alone: it's mostly not a figure.
         let spelled = tokens.compactMap { spelledNumbers[$0] }
-        return Set(numbers(in: text) + spelled).isSubset(of: allowedNumbers(facts))
+        return Set(numbers(in: text) + spelled).isSubset(of: allowed)
     }
 
     /// Every figure the app shows for these facts, plus the 7 in "last 7 days"
