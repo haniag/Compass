@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import FoundationModels
 import Testing
 @testable import Compass
 
@@ -270,28 +269,6 @@ struct InsightCheckTests {
         #expect(filled[0].id.hasPrefix("template."))
         #expect(filled[1].id.hasPrefix("ai."))
     }
-
-    @Test func answersWithNumbersShowFiguresInstead() {
-        let answer = InsightCheck.answer(text: "You raised $23,480.", factIDs: ["raised.lastSevenDays"], facts: demoFacts)
-        #expect(!answer.text.contains { $0.isNumber })
-        #expect(answer.factIDs == ["raised.lastSevenDays"])
-
-        let nothing = InsightCheck.answer(text: "About 12.", factIDs: [], facts: demoFacts)
-        #expect(nothing.text == InsightCheck.cantAnswer)
-    }
-
-    @Test func plainAnswersPassThrough() {
-        let answer = InsightCheck.answer(text: "Giving rose a little.", factIDs: ["raised.lastSevenDays", "x"], facts: demoFacts)
-        #expect(answer == NumbersAnswer(text: "Giving rose a little.", factIDs: ["raised.lastSevenDays"]))
-    }
-}
-
-struct PromptLineTests {
-    @Test func describesTheFactForTheModel() {
-        #expect(InsightWriter.promptLine(demoFacts[0])
-                == "id: newJoins.lastSevenDays. New joins: 386 in the last 7 days, 342 in the 7 days before (up 13%). This is good news.")
-        #expect(InsightWriter.promptLine(demoFacts[3]).hasSuffix("(down 1.4 pts). This needs attention."))
-    }
 }
 
 struct PulseSummaryTests {
@@ -315,17 +292,5 @@ struct PulseSummaryTests {
         let text = PulseSummary.text(period: .yesterday, range: range, headline: nil, facts: facts)
         #expect(text.hasSuffix("• Supporters: 48,312"))
         #expect(!text.contains("\n\n\n"))
-    }
-}
-
-struct ModelErrorTests {
-    @Test func recognisesAFullContextWindow() {
-        if #available(iOS 27.0, *) {
-            let full = LanguageModelError.contextSizeExceeded(
-                .init(contextSize: 4_096, tokenCount: 4_200, debugDescription: "test"))
-            #expect(InsightWriter.isContextFull(full))
-        }
-        #expect(!InsightWriter.isContextFull(CancellationError()))
-        #expect(!InsightWriter.isContextFull(URLError(.timedOut)))
     }
 }

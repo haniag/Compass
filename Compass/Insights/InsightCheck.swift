@@ -19,13 +19,6 @@ nonisolated struct InsightDraft: Hashable, Sendable {
     var suggestedAction: String?
 }
 
-/// A checked answer to an "Ask about your numbers" question.
-nonisolated struct NumbersAnswer: Hashable, Sendable {
-    let text: String
-    /// Facts to show as figures under the answer.
-    let factIDs: [String]
-}
-
 nonisolated enum InsightCheck {
     /// The drafts that are safe to show, as insights. Unknown fact IDs are removed first.
     static func validated(_ drafts: [InsightDraft], facts: [Fact]) -> [Insight] {
@@ -78,49 +71,7 @@ nonisolated enum InsightCheck {
         return (written + TemplateInsights.movers(missing)).sorted { $0.severity.rank < $1.severity.rank }
     }
 
-    /// An answer that's safe to show. Text with numbers in it is replaced, because
-    /// figures must come from the facts; the cited facts are shown instead.
-    static func answer(text: String, factIDs: [String], facts: [Fact]) -> NumbersAnswer {
-        let cited = knownIDs(factIDs, in: facts)
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty, isSafeCopy(trimmed) {
-            return NumbersAnswer(text: trimmed, factIDs: cited)
-        }
-        if !cited.isEmpty {
-            return NumbersAnswer(text: "Here are the figures that answer your question.", factIDs: cited)
-        }
-        return NumbersAnswer(text: cantAnswer, factIDs: [])
-    }
-
-    static let cantAnswer = "I can’t answer that from your numbers yet. Try asking about new joins, giving, average gift or email opens."
-
     // MARK: Rules
-
-    /// For "Ask about your numbers" answers, which may not contain figures at all.
-    /// Words the model may not use:
-    /// - no digits or amounts in words ("half", "twice"): figures come from facts;
-    /// - no "week": the app compares the last 7 days with the 7 days before and says so itself;
-    /// - no "we" / "our": the app speaks to the team, it isn't part of it.
-    static func isSafeCopy(_ text: String) -> Bool {
-        let words = Set(text.lowercased()
-            .split { !$0.isLetter && $0 != "’" && $0 != "'" }
-            .map { $0.replacingOccurrences(of: "’", with: "'") })
-        return !text.contains(where: \.isNumber) && words.isDisjoint(with: bannedWords)
-    }
-
-    private static let bannedWords: Set<String> = [
-        // Speaking as the organization.
-        "we", "we're", "we've", "we'll", "us", "our", "ours", "let's",
-        // Time periods the app shows itself.
-        "week", "weeks", "week's", "weekly",
-        // Quantities worked out by the model, or numbers spelled out ("four members").
-        // "one" is allowed: it's common in plain sentences ("one more gift").
-        "half", "halved", "double", "doubled", "twice", "triple", "tripled",
-        "third", "quarter", "percent", "percentage",
-        "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
-        "eleven", "twelve", "twenty", "thirty", "forty", "fifty", "hundred",
-        "hundreds", "thousand", "thousands", "million", "millions", "dozen", "dozens",
-    ]
 
     /// Good news and opportunities can't be about a number that got worse, and
     /// "needs attention" must be about one that did.

@@ -2,7 +2,7 @@
 //  InsightsView.swift
 //  Compass
 //
-//  Insights tab: the weekly digest, and questions about the numbers.
+//  Insights tab: the digest of what changed in the numbers.
 //
 
 import SwiftData
@@ -13,43 +13,29 @@ struct InsightsView: View {
 
     @State private var model = InsightsViewModel()
     @State private var whyInsight: Insight?
-    @FocusState private var isAskFocused: Bool
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    header
-                    privacyNote
-                    if pulse.refreshFailed {
-                        refreshFailedBanner
-                    }
-                    digest
-                    if model.canAsk {
-                        ForEach(model.exchanges) { exchange in
-                            ExchangeCard(exchange: exchange, facts: model.facts)
-                        }
-                        askBar
-                            .id("ask")
-                    } else if model.aiStatus == .turnedOff, !model.facts.isEmpty {
-                        Text("Turn on Apple Intelligence in Settings to ask questions about your numbers.")
-                            .font(.footnote)
-                            .foregroundStyle(Color.compassSecondaryText)
-                    } else if model.aiStatus == .gettingReady, !model.facts.isEmpty {
-                        Text("Apple Intelligence is still getting ready on this iPhone. Once it’s ready, it will write your insights and you can ask questions about your numbers.")
-                            .font(.footnote)
-                            .foregroundStyle(Color.compassSecondaryText)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                header
+                privacyNote
+                if pulse.refreshFailed {
+                    refreshFailedBanner
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                digest
+                if model.aiStatus == .turnedOff, !model.facts.isEmpty {
+                    Text("Turn on Apple Intelligence in Settings to have it write your insights.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.compassSecondaryText)
+                } else if model.aiStatus == .gettingReady, !model.facts.isEmpty {
+                    Text("Apple Intelligence is still getting ready on this iPhone. Once it’s ready, it will write your insights.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.compassSecondaryText)
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
-            // When a question goes out and when its answer comes back.
-            .onChange(of: model.isAnswering) {
-                withAnimation { proxy.scrollTo("ask", anchor: .bottom) }
-            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
         .background(Color.compassBackground)
         .foregroundStyle(Color.compassText)
@@ -123,45 +109,6 @@ struct InsightsView: View {
                 description: Text("Pull down to load your numbers.")
             )
         }
-    }
-
-    // MARK: Ask
-
-    private var askBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .foregroundStyle(Color.compassTeal)
-                .accessibilityHidden(true)
-            TextField("Ask about your numbers", text: $model.question)
-                .focused($isAskFocused)
-                .submitLabel(.send)
-                .onSubmit(send)
-            Button(action: send) {
-                Image(systemName: "arrow.right")
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.compassTeal.opacity(canSend ? 1 : 0.4), in: .circle)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canSend)
-            .accessibilityLabel("Ask")
-        }
-        .padding(.leading, 16)
-        .padding(.trailing, 6)
-        .frame(minHeight: 52)
-        .background(Color.compassCard, in: .capsule)
-        .overlay(Capsule().stroke(Color.compassDivider))
-    }
-
-    private var canSend: Bool {
-        !model.isAnswering && !model.question.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    private func send() {
-        guard canSend else { return }
-        isAskFocused = false
-        Task { await model.ask() }
     }
 }
 
@@ -282,36 +229,6 @@ private struct FigureChips: View {
                 }
             }
         }
-    }
-}
-
-/// One question and its answer.
-private struct ExchangeCard: View {
-    let exchange: InsightsViewModel.Exchange
-    let facts: [Fact]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(exchange.question)
-                .font(.subheadline.weight(.semibold))
-            if let answer = exchange.answer {
-                Text(answer.text)
-                    .font(.subheadline)
-                FigureChips(figures: InsightFigure.figures(for: answer.factIDs, in: facts))
-            } else if exchange.failed {
-                Text("Something went wrong answering that. Try asking another way.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.compassSecondaryText)
-            } else {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("Thinking…")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.compassSecondaryText)
-                }
-            }
-        }
-        .compassCard()
     }
 }
 

@@ -39,17 +39,6 @@ nonisolated enum InsightWriter {
         }
     }
 
-    /// True when the conversation no longer fits the model's context window.
-    /// Starting a new session with the same question works then.
-    static func isContextFull(_ error: Error) -> Bool {
-        // iOS 27 throws LanguageModelError; iOS 26 (the app still runs there) the older GenerationError.
-        if #available(iOS 27.0, macOS 27.0, *), case .contextSizeExceeded = error as? LanguageModelError {
-            return true
-        }
-        if case .exceededContextWindowSize = error as? LanguageModelSession.GenerationError { return true }
-        return false
-    }
-
     /// The worked example uses the same period words as the fact, e.g. "in the last 7 days".
     static func digestInstructions(for period: Fact.Period) -> String {
         let during = period.during
@@ -179,94 +168,6 @@ nonisolated enum InsightWriter {
         case nil: ""
         }
     }
-
-    /// "id: newJoins.lastSevenDays. New joins: 386 in the last 7 days, … This is good news."
-    static func promptLine(_ fact: Fact) -> String {
-        "id: \(fact.id). \(fact.summaryLine)\(verdict(fact))"
-    }
-}
-
-// MARK: - Ask about your numbers
-
-/// A conversation about the numbers. Follow-up questions see earlier answers.
-final class NumbersChat {
-    static func instructions(for period: Fact.Period) -> String {
-        """
-        You answer questions from nonprofit staff about their organization's numbers.
-        - Answer in one to three short, plain sentences. Be encouraging and specific.
-        - Never write digits, amounts or percentages. The app shows the figures for the facts you cite. \
-        Compare in words instead, like "more than \(period.before)" or "about the same".
-        - If the figures can't answer the question, say so plainly. Never guess or invent numbers.
-        - Speak to the reader as "you". Never write "we", "us", "our" or "let's".
-        - Don't mention dates or time periods, and don't restate amounts in words \
-        (no "half", "twice" or "percent"); the app shows them with the figures.
-        """
-    }
-
-    private let facts: [Fact]
-    private let instructions: String
-    private var session: LanguageModelSession
-    private var usesTool = true
-
-    init(facts: [Fact]) {
-        self.facts = facts
-        instructions = Self.instructions(for: facts.first?.period ?? .lastSevenDays)
-        session = LanguageModelSession(
-            tools: [NumbersTool(facts: facts)],
-            instructions: instructions + "\nCall getNumbers to look up figures; it is the only source of numbers."
-        )
-    }
-
-    func answer(_ question: String) async throws -> NumbersAnswer {
-        var reply = try await respond(to: question)
-        if !InsightCheck.isSafeCopy(reply.answer) {
-            // One reminder; if it still breaks the rules, InsightCheck replaces the text.
-            reply = try await respond(to: "Please answer again in plain words: no digits, no amounts or "
-                + "time periods, no \"we\" or \"our\". List the ids of the facts you used.")
-        }
-        return InsightCheck.answer(text: reply.answer, factIDs: reply.factIDs, facts: facts)
-    }
-
-    private func respond(to prompt: String) async throws -> GeneratedAnswer {
-        do {
-            return try await session.respond(to: prompt, generating: GeneratedAnswer.self).content
-        } catch where usesTool && !(error is CancellationError) && !InsightWriter.isContextFull(error) {
-            // (A full context isn't a tool problem: InsightsViewModel starts a new chat for it.)
-            // Tool calling isn't available everywhere (e.g. some simulators). The figures are
-            // few, so hand the same precomputed lines over in the instructions and try again.
-            usesTool = false
-            session = LanguageModelSession(instructions: instructions + "\nThe only figures you have:\n"
-                + facts.map(InsightWriter.promptLine).joined(separator: "\n"))
-            return try await session.respond(to: prompt, generating: GeneratedAnswer.self).content
-        }
-    }
-}
-
-/// Gives the model precomputed figures only. It never calculates anything itself.
-nonisolated struct NumbersTool: Tool {
-    let name = "getNumbers"
-    var description: String {
-        let period = facts.first?.period ?? .lastSevenDays
-        return """
-            Looks up the organization's figures: total supporters, new joins, money raised, \
-            average gift and email open rate, for \(period.title.lowercased()) and \(period.before).
-            """
-    }
-
-    @Generable
-    nonisolated struct Arguments {
-        @Guide(description: "Which figure to look up, or all of them",
-               .anyOf(["all", "supporters", "newJoins", "raised", "averageGift", "emailOpenRate"]))
-        var figure: String
-    }
-
-    let facts: [Fact]
-
-    @concurrent func call(arguments: Arguments) async throws -> String {
-        let matching = facts.filter { arguments.figure == "all" || $0.metric.rawValue == arguments.figure }
-        guard !matching.isEmpty else { return "That figure isn't available." }
-        return matching.map(InsightWriter.promptLine).joined(separator: "\n")
-    }
 }
 
 // MARK: - Generated types
@@ -279,12 +180,4 @@ nonisolated struct GeneratedInsight {
     var explanation: String
     @Guide(description: "One practical next step the reader can take in the next few days, with no numbers")
     var suggestedAction: String
-}
-
-@Generable
-nonisolated struct GeneratedAnswer {
-    @Guide(description: "Ids of the facts your answer is about, copied exactly; empty if none")
-    var factIDs: [String]
-    @Guide(description: "Your answer in one to three short sentences, with no numbers")
-    var answer: String
 }

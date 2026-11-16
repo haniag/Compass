@@ -2,13 +2,12 @@
 //  InsightsViewModel.swift
 //  Compass
 //
-//  The weekly digest and "Ask about your numbers". Written from the facts Pulse
-//  loaded: by Apple Intelligence when it's available, from templates otherwise.
+//  The digest, written from the facts Pulse loaded: by Apple Intelligence when
+//  it's available, from templates otherwise.
 //
 
 import Foundation
 import Observation
-import os
 
 @Observable
 final class InsightsViewModel {
@@ -17,31 +16,15 @@ final class InsightsViewModel {
         case templates
     }
 
-    struct Exchange: Identifiable {
-        let id = UUID()
-        let question: String
-        var answer: NumbersAnswer?
-        var failed = false
-    }
-
-    /// Longer questions are cut; the on-device model has a small context.
-    private static let maxQuestionLength = 300
-
     private(set) var insights: [Insight] = []
     /// The facts the insights and answers were written from.
     private(set) var facts: [Fact] = []
     private(set) var author: Author = .templates
     private(set) var isWriting = false
     private(set) var aiStatus = InsightWriter.status
-    private(set) var exchanges: [Exchange] = []
-    private(set) var isAnswering = false
-    var question = ""
 
     private var writtenFrom: [Fact]?
     private var currentJob = UUID()
-    private var chat: NumbersChat?
-
-    var canAsk: Bool { aiStatus == .available && !facts.isEmpty }
 
     // MARK: Digest
 
@@ -53,9 +36,6 @@ final class InsightsViewModel {
         let job = UUID()
         currentJob = job
         facts = newFacts
-        // New numbers: earlier answers may no longer be true.
-        exchanges = []
-        chat = nil
 
         let highlights = InsightRules.highlights(from: newFacts)
         guard aiStatus == .available, !highlights.isEmpty else {
@@ -88,48 +68,5 @@ final class InsightsViewModel {
         let steady = TemplateInsights.steadyNote(facts: facts, highlights: highlights)
         insights = InsightCheck.filling(written, highlights: highlights) + [steady].compactMap { $0 }
         author = written.isEmpty ? .templates : .appleIntelligence
-    }
-
-    // MARK: Ask
-
-    func ask() async {
-        let text = String(question.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxQuestionLength))
-        guard !text.isEmpty, canAsk, !isAnswering else { return }
-        question = ""
-
-        let exchange = Exchange(question: text)
-        exchanges.append(exchange)
-        isAnswering = true
-        defer { isAnswering = false }
-
-        let chat = self.chat ?? NumbersChat(facts: facts)
-        self.chat = chat
-        var result: NumbersAnswer?
-        do {
-            result = try await chat.answer(text)
-        } catch where InsightWriter.isContextFull(error) {
-            // The conversation got too long for the model. Start a new one (earlier
-            // answers stay on screen) and ask the same question once more.
-            InsightWriter.log.notice("Chat context full; asking again in a new chat")
-            let fresh = NumbersChat(facts: facts)
-            self.chat = fresh
-            do {
-                result = try await fresh.answer(text)
-            } catch {
-                InsightWriter.log.error("Answer failed in a new chat: \(String(describing: error), privacy: .public)")
-                self.chat = nil
-            }
-        } catch {
-            // Start fresh next time.
-            InsightWriter.log.error("Answer failed: \(String(describing: error), privacy: .public)")
-            self.chat = nil
-        }
-
-        guard let index = exchanges.firstIndex(where: { $0.id == exchange.id }) else { return }
-        if let result {
-            exchanges[index].answer = result
-        } else {
-            exchanges[index].failed = true
-        }
     }
 }
