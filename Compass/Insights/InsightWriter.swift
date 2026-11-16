@@ -19,7 +19,9 @@ nonisolated enum InsightWriter {
         case available
         /// The device supports it but Apple Intelligence is off in Settings.
         case turnedOff
-        /// Not supported here, still downloading, or not in this language.
+        /// Turned on, but the model is still downloading or setting itself up.
+        case gettingReady
+        /// Not supported here, or not in this language.
         case unavailable
     }
 
@@ -30,9 +32,22 @@ nonisolated enum InsightWriter {
             return model.supportsLocale() ? .available : .unavailable
         case .unavailable(.appleIntelligenceNotEnabled):
             return .turnedOff
+        case .unavailable(.modelNotReady):
+            return .gettingReady
         case .unavailable:
             return .unavailable
         }
+    }
+
+    /// True when the conversation no longer fits the model's context window.
+    /// Starting a new session with the same question works then.
+    static func isContextFull(_ error: Error) -> Bool {
+        // iOS 27 throws LanguageModelError; iOS 26 (the app still runs there) the older GenerationError.
+        if #available(iOS 27.0, macOS 27.0, *), case .contextSizeExceeded = error as? LanguageModelError {
+            return true
+        }
+        if case .exceededContextWindowSize = error as? LanguageModelSession.GenerationError { return true }
+        return false
     }
 
     /// The worked example uses the same period words as the fact, e.g. "in the last 7 days".
@@ -178,7 +193,8 @@ final class NumbersChat {
     private func respond(to prompt: String) async throws -> GeneratedAnswer {
         do {
             return try await session.respond(to: prompt, generating: GeneratedAnswer.self).content
-        } catch where usesTool && !(error is CancellationError) {
+        } catch where usesTool && !(error is CancellationError) && !InsightWriter.isContextFull(error) {
+            // (A full context isn't a tool problem: InsightsViewModel starts a new chat for it.)
             // Tool calling isn't available everywhere (e.g. some simulators). The figures are
             // few, so hand the same precomputed lines over in the instructions and try again.
             usesTool = false

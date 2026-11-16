@@ -36,6 +36,10 @@ struct InsightsView: View {
                         Text("Turn on Apple Intelligence in Settings to ask questions about your numbers.")
                             .font(.footnote)
                             .foregroundStyle(Color.compassSecondaryText)
+                    } else if model.aiStatus == .gettingReady, !model.facts.isEmpty {
+                        Text("Apple Intelligence is still getting ready on this iPhone. Once it’s ready, it will write your insights and you can ask questions about your numbers.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.compassSecondaryText)
                     }
                 }
                 .padding(.horizontal, 20)

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import FoundationModels
 import Testing
 @testable import Compass
 
@@ -314,5 +315,17 @@ struct PulseSummaryTests {
         let text = PulseSummary.text(period: .yesterday, range: range, headline: nil, facts: facts)
         #expect(text.hasSuffix("• Supporters: 48,312"))
         #expect(!text.contains("\n\n\n"))
+    }
+}
+
+struct ModelErrorTests {
+    @Test func recognisesAFullContextWindow() {
+        if #available(iOS 27.0, *) {
+            let full = LanguageModelError.contextSizeExceeded(
+                .init(contextSize: 4_096, tokenCount: 4_200, debugDescription: "test"))
+            #expect(InsightWriter.isContextFull(full))
+        }
+        #expect(!InsightWriter.isContextFull(CancellationError()))
+        #expect(!InsightWriter.isContextFull(URLError(.timedOut)))
     }
 }

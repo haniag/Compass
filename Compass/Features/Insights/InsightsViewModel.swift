@@ -8,6 +8,7 @@
 
 import Foundation
 import Observation
+import os
 
 @Observable
 final class InsightsViewModel {
@@ -92,13 +93,25 @@ final class InsightsViewModel {
 
         let chat = self.chat ?? NumbersChat(facts: facts)
         self.chat = chat
-        let result: NumbersAnswer?
+        var result: NumbersAnswer?
         do {
             result = try await chat.answer(text)
+        } catch where InsightWriter.isContextFull(error) {
+            // The conversation got too long for the model. Start a new one (earlier
+            // answers stay on screen) and ask the same question once more.
+            InsightWriter.log.notice("Chat context full; asking again in a new chat")
+            let fresh = NumbersChat(facts: facts)
+            self.chat = fresh
+            do {
+                result = try await fresh.answer(text)
+            } catch {
+                InsightWriter.log.error("Answer failed in a new chat: \(String(describing: error), privacy: .public)")
+                self.chat = nil
+            }
         } catch {
-            // Start fresh next time (e.g. the conversation got too long).
+            // Start fresh next time.
+            InsightWriter.log.error("Answer failed: \(String(describing: error), privacy: .public)")
             self.chat = nil
-            result = nil
         }
 
         guard let index = exchanges.firstIndex(where: { $0.id == exchange.id }) else { return }
