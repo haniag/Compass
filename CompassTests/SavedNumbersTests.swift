@@ -52,6 +52,39 @@ struct SavedNumbersTests {
         SavedNumbers.save(totals, as: "giving.daily.1", in: context)
         #expect(SavedNumbers.load([Date: Decimal].self, key: "giving.daily.1", in: context)?.value == totals)
     }
+
+    // MARK: Pulse briefing
+
+    private static let briefingFacts = [
+        PulseFacts.supporters(now: 48_312, before: 48_098, period: .lastSevenDays),
+        Fact(metric: .newJoins, unit: .count, value: 386, baseline: 342, period: .lastSevenDays),
+    ]
+
+    @Test func sameFactsReuseTheSavedBriefing() {
+        SavedBriefing.save("You welcomed 386 new supporters.", facts: Self.briefingFacts, in: context)
+        #expect(SavedBriefing.text(for: Self.briefingFacts, in: context) == "You welcomed 386 new supporters.")
+    }
+
+    @Test func changedFactsDontReuseTheSavedBriefing() {
+        SavedBriefing.save("You welcomed 386 new supporters.", facts: Self.briefingFacts, in: context)
+
+        var changed = Self.briefingFacts
+        changed[1] = Fact(metric: .newJoins, unit: .count, value: 390, baseline: 342, period: .lastSevenDays)
+        #expect(SavedBriefing.text(for: changed, in: context) == nil)
+        // One figure fewer (a service failed) is different numbers too.
+        #expect(SavedBriefing.text(for: [Self.briefingFacts[0]], in: context) == nil)
+        // The same figures for another period are another briefing.
+        let otherPeriod = [Fact(metric: .newJoins, unit: .count, value: 386, baseline: 342, period: .lastThirtyDays)]
+        #expect(SavedBriefing.text(for: otherPeriod, in: context) == nil)
+    }
+
+    @Test func eachPeriodKeepsItsOwnBriefing() {
+        let month = [Fact(metric: .newJoins, unit: .count, value: 1_200, baseline: 1_100, period: .lastMonth)]
+        SavedBriefing.save("Seven days.", facts: Self.briefingFacts, in: context)
+        SavedBriefing.save("Last month.", facts: month, in: context)
+        #expect(SavedBriefing.text(for: Self.briefingFacts, in: context) == "Seven days.")
+        #expect(SavedBriefing.text(for: month, in: context) == "Last month.")
+    }
 }
 
 struct WidgetSnapshotTests {

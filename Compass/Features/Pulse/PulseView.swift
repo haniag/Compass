@@ -60,7 +60,7 @@ struct PulseView: View {
         .foregroundStyle(Color.compassText)
         .refreshable { await model.refresh(in: modelContext) }
         .task { await model.refreshIfStale(in: modelContext) }
-        .task(id: model.allFacts) { await model.writeBriefing() }
+        .task(id: model.allFacts) { await model.writeBriefing(in: modelContext) }
         .onChange(of: model.selectedPeriod) {
             Task { await model.refresh(in: modelContext) }
         }

@@ -190,13 +190,20 @@ final class PulseViewModel {
     // MARK: Briefing
 
     /// Writes the briefing when the numbers change. Cheap to call again with the same numbers.
-    func writeBriefing() async {
+    /// A briefing saved earlier for exactly these numbers is shown without running the model.
+    func writeBriefing(in context: ModelContext) async {
         let facts = allFacts
         guard facts != briefingFacts else { return }
         briefing = nil
         // A cancelled earlier run may have left this on.
         isWritingBriefing = false
         guard InsightWriter.status == .available, !facts.isEmpty else { return }
+
+        if let saved = SavedBriefing.text(for: facts, in: context) {
+            briefing = saved
+            briefingFacts = facts
+            return
+        }
 
         isWritingBriefing = true
         let text = await BriefingWriter.briefing(from: facts)
@@ -205,5 +212,9 @@ final class PulseViewModel {
         briefing = text
         briefingFacts = facts
         isWritingBriefing = false
+        // BriefingWriter only returns text that passed BriefingCheck.
+        if let text {
+            SavedBriefing.save(text, facts: facts, in: context)
+        }
     }
 }
