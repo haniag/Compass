@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import FoundationModels
 import Observation
 import SwiftData
 
@@ -44,6 +45,9 @@ final class PulseViewModel {
     private let credentials: ENCredentials
     private let client: ENClient
     private var briefingFacts: [Fact]?
+    /// A briefing session loading the model while the numbers are fetched. The next
+    /// briefing for that period uses it for its first try.
+    @ObservationIgnored private var warmSession: (period: Fact.Period, session: LanguageModelSession)?
 
     /// What's kept on the device for each period, so Pulse opens with numbers.
     private nonisolated struct Saved: Codable {
@@ -105,6 +109,7 @@ final class PulseViewModel {
             if shownPeriod != loading {
                 restore(loading, in: context)
             }
+            prewarmBriefingIfNeeded(for: loading, in: context)
             guard await load(loading, in: context) else { return }
         } while loading != selectedPeriod
     }
@@ -189,6 +194,19 @@ final class PulseViewModel {
 
     // MARK: Briefing
 
+    /// Starts loading the model while `period`'s numbers are fetched, but only when a
+    /// briefing will be written: Apple Intelligence is available and the numbers on
+    /// screen don't already have one (in memory or saved).
+    private func prewarmBriefingIfNeeded(for period: Fact.Period, in context: ModelContext) {
+        guard InsightWriter.status == .available, warmSession?.period != period else { return }
+        let facts = allFacts
+        if shownPeriod == period, !facts.isEmpty,
+           facts == briefingFacts || SavedBriefing.text(for: facts, in: context) != nil {
+            return
+        }
+        warmSession = (period, BriefingWriter.prewarmedSession(for: period))
+    }
+
     /// Writes the briefing when the numbers change. Cheap to call again with the same numbers.
     /// A briefing saved earlier for exactly these numbers is shown without running the model.
     func writeBriefing(in context: ModelContext) async {
@@ -206,7 +224,9 @@ final class PulseViewModel {
         }
 
         isWritingBriefing = true
-        let text = await BriefingWriter.briefing(from: facts)
+        let warm = warmSession?.period == facts[0].period ? warmSession?.session : nil
+        warmSession = nil
+        let text = await BriefingWriter.briefing(from: facts, warmedUp: warm)
         // The numbers changed again, or the screen went away; it'll be written next time.
         guard !Task.isCancelled, facts == allFacts else { return }
         briefing = text

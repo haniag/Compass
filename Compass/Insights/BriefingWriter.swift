@@ -42,12 +42,22 @@ nonisolated enum BriefingWriter {
         "Metrics:\n" + facts.map(\.summaryLine).joined(separator: "\n")
     }
 
+    /// A briefing session with the model already loading, so the first answer comes sooner.
+    /// Pulse makes one while the numbers are fetched and hands it to `briefing(from:warmedUp:)`.
+    static func prewarmedSession(for period: Fact.Period) -> LanguageModelSession {
+        let session = LanguageModelSession(instructions: instructions(for: period))
+        session.prewarm()
+        return session
+    }
+
     /// Nil when the model fails or breaks the rules three times; Pulse then shows its template insight.
-    static func briefing(from facts: [Fact]) async -> String? {
+    /// `warmedUp`, from `prewarmedSession(for:)` with the facts' period, is used for the first try.
+    static func briefing(from facts: [Fact], warmedUp: LanguageModelSession? = nil) async -> String? {
         guard !facts.isEmpty else { return nil }
         for attempt in 1...3 {
             guard !Task.isCancelled else { return nil }
-            let session = LanguageModelSession(instructions: instructions(for: facts[0].period))
+            let session = attempt == 1 ? warmedUp ?? LanguageModelSession(instructions: instructions(for: facts[0].period))
+                : LanguageModelSession(instructions: instructions(for: facts[0].period))
             let text: String
             do {
                 let words = try await session.respond(
