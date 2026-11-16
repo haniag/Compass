@@ -38,9 +38,7 @@ nonisolated enum InsightCheck {
             let explanation = draft.explanation.trimmingCharacters(in: .whitespacesAndNewlines)
             let action = draft.suggestedAction?.trimmingCharacters(in: .whitespacesAndNewlines)
             let citedFacts = cited.compactMap { id in facts.first { $0.id == id } }
-            // Figures are allowed, but only this insight's own, as the app shows them.
-            guard !title.isEmpty, !explanation.isEmpty,
-                  [title, explanation, action ?? ""].allSatisfy({ FigureCheck.quotesOnlyFigures(of: citedFacts, in: $0) }),
+            guard wordingProblem(in: draft, citedFacts: citedFacts) == nil,
                   severity(draft.severity, agreesWith: citedFacts)
             else { return nil }
 
@@ -54,6 +52,22 @@ nonisolated enum InsightCheck {
                 isGenerated: true
             )
         }
+    }
+
+    /// What's wrong with a draft's words, and in which part ("title", "explanation" or
+    /// "suggestedAction", the names the model writes them under); nil when the words pass.
+    /// Figures are allowed, but only the cited facts' own, as the app shows them.
+    /// (`validated` also checks the fact IDs and severity, which Swift sets, not the model.)
+    static func wordingProblem(in draft: InsightDraft,
+                               citedFacts: [Fact]) -> (part: String, problem: FigureCheck.Problem)? {
+        let parts = [("title", draft.title), ("explanation", draft.explanation),
+                     ("suggestedAction", draft.suggestedAction ?? "")]
+        for (part, text) in parts {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty, part != "suggestedAction" { return (part, .empty) }
+            if let problem = FigureCheck.problem(quoting: citedFacts, in: trimmed) { return (part, problem) }
+        }
+        return nil
     }
 
     /// `written` plus a template insight for every highlight the model didn't cover,

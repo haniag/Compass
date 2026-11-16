@@ -87,6 +87,10 @@ nonisolated enum InsightWriter {
         let text: String?
         /// Why the model call failed, when it did.
         let error: String?
+        /// Why the check rejected the text, when it did, and in which part of a digest draft.
+        let problem: FigureCheck.Problem?
+        /// "title", "explanation" or "suggestedAction" for a digest draft; nil for the briefing.
+        var part: String? = nil
         let passed: Bool
     }
 
@@ -98,41 +102,55 @@ nonisolated enum InsightWriter {
                        onAttempt: (Attempt) -> Void = { _ in }) async throws -> [InsightDraft] {
         var drafts: [InsightDraft] = []
         for fact in highlights {
-            // Two retries if the words break the copy rules; after that the template is used.
+            // One session per fact. Two retries if the words break the copy rules, each telling
+            // the model what was wrong; after that the template is used.
+            let session = LanguageModelSession(instructions: digestInstructions(for: fact.period))
+            var request = prompt(for: fact)
             for attempt in 1...3 {
                 try Task.checkCancellation()
                 let draft: InsightDraft
                 do {
-                    draft = try await self.draft(about: fact)
+                    draft = try await self.draft(about: fact, in: session, request: request)
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
                     // The model refused or failed on this fact (e.g. a safety check).
                     // Skip it; its template insight fills the gap.
                     log.error("Draft for \(fact.id, privacy: .public) failed: \(String(describing: error), privacy: .public)")
-                    onAttempt(Attempt(factID: fact.id, number: attempt, text: nil, error: String(describing: error), passed: false))
+                    onAttempt(Attempt(factID: fact.id, number: attempt, text: nil, error: String(describing: error),
+                                      problem: nil, passed: false))
                     break
                 }
                 let passed = InsightCheck.validated([draft], facts: [fact]).count == 1
+                let rejection = passed ? nil : InsightCheck.wordingProblem(in: draft, citedFacts: [fact])
                 onAttempt(Attempt(factID: fact.id, number: attempt,
                                   text: [draft.title, draft.explanation, draft.suggestedAction ?? ""].joined(separator: " | "),
-                                  error: nil, passed: passed))
+                                  error: nil, problem: rejection?.problem, part: rejection?.part, passed: passed))
                 if !passed {
-                    log.notice("Draft for \(fact.id, privacy: .public) broke the copy rules (attempt \(attempt)): \(draft.title, privacy: .public) | \(draft.explanation, privacy: .public) | \(draft.suggestedAction ?? "", privacy: .public)")
+                    let reason = rejection.map { "\($0.part): \($0.problem)" } ?? "fact or severity"
+                    log.notice("Draft for \(fact.id, privacy: .public) broke the copy rules (attempt \(attempt), \(reason, privacy: .public)): \(draft.title, privacy: .public) | \(draft.explanation, privacy: .public) | \(draft.suggestedAction ?? "", privacy: .public)")
                 }
                 if passed || attempt == 3 {
                     drafts.append(draft)
                     break
                 }
+                request = correction(rejection, period: fact.period)
             }
         }
         return drafts
     }
 
-    private static func draft(about fact: Fact) async throws -> InsightDraft {
-        let session = LanguageModelSession(instructions: digestInstructions(for: fact.period))
+    /// The follow-up after a rejected draft: which part was wrong and why, then the same request again.
+    static func correction(_ rejection: (part: String, problem: FigureCheck.Problem)?, period: Fact.Period) -> String {
+        let what = rejection.map { "The \($0.part) can't be used. \($0.problem.correction(for: period))" }
+            ?? "That insight can't be used."
+        return what + " Write the title, explanation and suggestedAction again about the same fact, following every rule."
+    }
+
+    private static func draft(about fact: Fact, in session: LanguageModelSession,
+                              request: String) async throws -> InsightDraft {
         let words = try await session.respond(
-            to: prompt(for: fact),
+            to: request,
             generating: GeneratedInsight.self,
             options: GenerationOptions(temperature: 0.5)
         ).content

@@ -55,15 +55,17 @@ nonisolated enum BriefingWriter {
     /// `onAttempt` hears about every try (PromptLab measures with it; the app doesn't use it).
     static func briefing(from facts: [Fact], warmedUp: LanguageModelSession? = nil,
                          onAttempt: (InsightWriter.Attempt) -> Void = { _ in }) async -> String? {
-        guard !facts.isEmpty else { return nil }
+        guard let period = facts.first?.period else { return nil }
+        // One session for all three tries: after a rejected draft the model is told what was
+        // wrong and asked again, so it can see its own draft and fix that one thing.
+        let session = warmedUp ?? LanguageModelSession(instructions: instructions(for: period))
+        var request = prompt(for: facts)
         for attempt in 1...3 {
             guard !Task.isCancelled else { return nil }
-            let session = attempt == 1 ? warmedUp ?? LanguageModelSession(instructions: instructions(for: facts[0].period))
-                : LanguageModelSession(instructions: instructions(for: facts[0].period))
             let text: String
             do {
                 let words = try await session.respond(
-                    to: prompt(for: facts),
+                    to: request,
                     generating: GeneratedBriefing.self,
                     options: GenerationOptions(temperature: 0.3)
                 ).content
@@ -72,15 +74,24 @@ nonisolated enum BriefingWriter {
                     .joined(separator: " ")
             } catch {
                 InsightWriter.log.error("Briefing failed: \(String(describing: error), privacy: .public)")
-                onAttempt(.init(factID: nil, number: attempt, text: nil, error: String(describing: error), passed: false))
+                onAttempt(.init(factID: nil, number: attempt, text: nil, error: String(describing: error),
+                                problem: nil, passed: false))
                 return nil
             }
-            let passed = BriefingCheck.isSafe(text, facts: facts)
-            onAttempt(.init(factID: nil, number: attempt, text: text, error: nil, passed: passed))
-            if passed { return text }
-            InsightWriter.log.notice("Briefing broke the rules (attempt \(attempt)): \(text, privacy: .public)")
+            let problem = BriefingCheck.problem(with: text, facts: facts)
+            onAttempt(.init(factID: nil, number: attempt, text: text, error: nil,
+                            problem: problem, passed: problem == nil))
+            guard let problem else { return text }
+            InsightWriter.log.notice("Briefing broke the rules (attempt \(attempt), \(problem.description, privacy: .public)): \(text, privacy: .public)")
+            request = correction(problem, period: period)
         }
         return nil
+    }
+
+    /// The follow-up after a rejected briefing: what was wrong, then the same request again.
+    static func correction(_ problem: FigureCheck.Problem, period: Fact.Period) -> String {
+        "That briefing can't be used. \(problem.correction(for: period)) "
+            + "Write the two sentences again from the same metrics, following every rule."
     }
 }
 
@@ -99,9 +110,15 @@ nonisolated enum BriefingCheck {
     static let maxWords = 70
 
     static func isSafe(_ text: String, facts: [Fact]) -> Bool {
-        guard !text.isEmpty, text.split(separator: " ").count <= maxWords else { return false }
+        problem(with: text, facts: facts) == nil
+    }
+
+    /// Why `isSafe` would say false, or nil when the briefing can be shown.
+    static func problem(with text: String, facts: [Fact]) -> FigureCheck.Problem? {
+        guard !text.isEmpty else { return .empty }
+        guard text.split(separator: " ").count <= maxWords else { return .tooLong(maxWords: maxWords) }
         // "Opens rose 1.4 pts" when they fell is wrong even though 1.4 is a real figure.
-        return FigureCheck.quotesOnlyFigures(of: facts, in: text)
-            && FigureCheck.agreesOnDirections(text, changes: facts.compactMap(\.change))
+        return FigureCheck.problem(quoting: facts, in: text)
+            ?? FigureCheck.directionProblem(text, changes: facts.compactMap(\.change))
     }
 }

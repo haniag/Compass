@@ -97,9 +97,9 @@ enum PassRates {
                 for attempt in attempts {
                     if let error = attempt.error { errors[short(error), default: 0] += 1 }
                     guard !attempt.passed, let text = attempt.text else { continue }
-                    let why = Diagnosis.briefing(text, facts: set.facts)
-                    why.forEach { reasons["Briefing: " + $0, default: 0] += 1 }
-                    rejections.append(Rejection(set: set.name, text: text, reasons: why))
+                    let why = attempt.reason
+                    reasons["Briefing: " + attempt.reasonKind, default: 0] += 1
+                    rejections.append(Rejection(set: set.name, text: text, reasons: [why]))
                 }
                 print(text == nil ? "failed after \(attempts.count)" : "ok after \(attempts.count)", terminator: "; digest… ")
                 fflush(stdout)
@@ -116,9 +116,9 @@ enum PassRates {
                     for attempt in mine {
                         if let error = attempt.error { errors[short(error), default: 0] += 1 }
                         guard !attempt.passed, let text = attempt.text else { continue }
-                        let why = Diagnosis.digest(text, fact: fact)
-                        why.forEach { reasons["Digest: " + $0, default: 0] += 1 }
-                        rejections.append(Rejection(set: "\(set.name), \(fact.metric.rawValue)", text: text, reasons: why))
+                        let why = attempt.reason
+                        reasons["Digest: " + attempt.reasonKind, default: 0] += 1
+                        rejections.append(Rejection(set: "\(set.name), \(fact.metric.rawValue)", text: text, reasons: [why]))
                     }
                 }
                 print("\(attempts.filter(\.passed).count)/\(highlights.count) facts passed")
@@ -169,8 +169,9 @@ enum PassRates {
         }
 
         lines += ["", "## Rejection reasons", "",
-                  "Every rejected answer, by reason (one answer can have several). Worked out by PromptLab "
-                      + "from the check's rules; \"other\" means none of them matched.", "",
+                  "Every rejected answer, by the first problem the app's check found in it "
+                      + "(`FigureCheck.Problem`, the same reason the app logs and tells the model on a retry). "
+                      + "Retries are told what was wrong, in the same session.", "",
                   "| Reason | Count |", "|---|---|"]
         for (reason, count) in reasons.sorted(by: { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }) {
             lines.append("| \(reason) | \(count) |")
@@ -217,52 +218,27 @@ extension PassRates.Tally {
     }
 }
 
-/// Why a rejected answer failed, worked out from the same rules the checks use.
-enum Diagnosis {
-    static func briefing(_ text: String, facts: [Fact]) -> [String] {
-        var why: [String] = []
-        if text.split(separator: " ").count > BriefingCheck.maxWords { why.append("too long") }
-        if !FigureCheck.agreesOnDirections(text, changes: facts.compactMap(\.change)) {
-            why.append("said a figure moved the wrong way")
-        }
-        why += figures(text, facts: facts)
-        return why.isEmpty ? ["other"] : why
+extension InsightWriter.Attempt {
+    /// The check's reason, with the part of a digest draft it was found in.
+    var reason: String {
+        let problem = problem.map(String.init(describing:)) ?? "fact or severity"
+        return part.map { "\($0): \(problem)" } ?? problem
     }
 
-    static func digest(_ joined: String, fact: Fact) -> [String] {
-        let parts = joined.components(separatedBy: " | ")
-        var why: [String] = []
-        if parts.first?.trimmingCharacters(in: .whitespaces).isEmpty == true { why.append("empty title") }
-        for part in parts { why += figures(part, facts: [fact]) }
-        why = Array(NSOrderedSet(array: why)) as! [String]
-        return why.isEmpty ? ["other"] : why
-    }
-
-    private static func figures(_ text: String, facts: [Fact]) -> [String] {
-        guard !FigureCheck.quotesOnlyFigures(of: facts, in: text) else { return [] }
-        var why: [String] = []
-        let allowed = FigureCheck.allowedNumbers(facts)
-        let unknown = FigureCheck.numbers(in: text).filter { !allowed.contains($0) }
-        if !unknown.isEmpty { why.append("quoted a figure that isn't in the facts") }
-        let words = Set(text.lowercased().replacingOccurrences(of: "’", with: "'")
-            .split { !$0.isLetter && $0 != "'" }.map(String.init))
-        let period = facts.first?.period
-        if !words.isDisjoint(with: ["we", "we're", "we've", "we'll", "us", "our", "ours", "let's"]) {
-            why.append("spoke as \"we\"/\"our\"")
+    /// The reason without the word or figure, so rejections can be counted by kind.
+    var reasonKind: String {
+        let kind: String
+        switch problem {
+        case .empty?: kind = "a part was empty"
+        case .tooLong?: kind = "too long"
+        case .speaksAsOrganization?: kind = "spoke as \"we\"/\"our\""
+        case .wrongTimeWords(let word)?: kind = "wrong time words (\(word))"
+        case .amountInWords(let word)?: kind = "amount in words (\(word))"
+        case .percentWithoutNumber?: kind = "\"percent\" without a figure"
+        case .unknownFigure?: kind = "quoted a figure that isn't in the facts"
+        case .wrongDirection?: kind = "said a figure moved the wrong way"
+        case nil: kind = "fact or severity"
         }
-        if !words.isDisjoint(with: ["week", "weeks", "week's", "weekly", "today", "tonight"]) {
-            why.append("said \"week\" or \"today\"")
-        }
-        if period != .yesterday, words.contains("yesterday") { why.append("said \"yesterday\"") }
-        if period != .lastMonth, !words.isDisjoint(with: ["month", "months", "month's", "monthly"]) {
-            why.append("said \"month\"")
-        }
-        if text.lowercased().contains("this month") { why.append("said \"this month\"") }
-        if !words.isDisjoint(with: ["half", "halved", "double", "doubled", "twice", "triple", "tripled", "third",
-                                    "quarter", "hundred", "hundreds", "thousand", "thousands", "million", "dozen",
-                                    "percent", "percentage"]) {
-            why.append("an amount in words")
-        }
-        return why.isEmpty ? ["a spelled-out number that isn't a figure"] : why
+        return part.map { "\($0): \(kind)" } ?? kind
     }
 }

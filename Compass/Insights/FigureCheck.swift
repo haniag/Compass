@@ -9,13 +9,76 @@
 import Foundation
 
 nonisolated enum FigureCheck {
+    /// Why a piece of generated text was rejected. `description` is for the `AI` log;
+    /// `correction(for:)` is the short note the model gets on a retry.
+    enum Problem: Equatable, Sendable, CustomStringConvertible {
+        /// Nothing was written (an empty title or explanation).
+        case empty
+        /// More words than the briefing allows.
+        case tooLong(maxWords: Int)
+        /// "we", "our", "let's": the app speaks to the team, it isn't part of it.
+        case speaksAsOrganization(word: String)
+        /// "week", "today", "this month", or "month"/"yesterday" outside their own period.
+        case wrongTimeWords(word: String)
+        /// "hundreds", "a third", or "half"/"double" when the figures don't show that change.
+        case amountInWords(word: String)
+        /// "percent" with no number right before it ("a few percent").
+        case percentWithoutNumber
+        /// A number that isn't one of the figures the app shows.
+        case unknownFigure(Decimal)
+        /// A change said to move the opposite way: "rose 13%" when it fell 13%.
+        case wrongDirection(figure: Decimal, actuallyUp: Bool)
+
+        var description: String {
+            switch self {
+            case .empty: "a part was empty"
+            case .tooLong(let max): "longer than \(max) words"
+            case .speaksAsOrganization(let word): "spoke as the organization (\"\(word)\")"
+            case .wrongTimeWords(let word): "named the wrong time period (\"\(word)\")"
+            case .amountInWords(let word): "put an amount into words (\"\(word)\")"
+            case .percentWithoutNumber: "said \"percent\" without a figure"
+            case .unknownFigure(let number): "quoted \(number), which isn't one of the figures"
+            case .wrongDirection(let number, let up): "said the change of \(number) went \(up ? "down" : "up")"
+            }
+        }
+
+        /// One or two sentences telling the model what to fix. Names only words and
+        /// figures it wrote itself, or figures it was given.
+        func correction(for period: Fact.Period?) -> String {
+            switch self {
+            case .empty:
+                return "Part of it was empty. Fill in every part."
+            case .tooLong:
+                return "It was too long. Keep it to two short sentences."
+            case .speaksAsOrganization(let word):
+                return "It said \"\(word)\". Speak to the reader as \"you\" and \"your supporters\"; never write \"we\", \"us\", \"our\" or \"let's\"."
+            case .wrongTimeWords(let word):
+                let instead = period.map { " Say \"\($0.during)\" instead." } ?? ""
+                return "It said \"\(word)\", which is the wrong time period.\(instead)"
+            case .amountInWords(let word):
+                return "It said \"\(word)\". Don't put amounts into words; quote the figures with digits, exactly as they are written."
+            case .percentWithoutNumber:
+                return "It said \"percent\" without a figure. Quote percentages exactly as they are written, or leave them out."
+            case .unknownFigure(let number):
+                return "It quoted \(number), which isn't one of the figures you were given. Quote only those figures, exactly as they are written, and never work out a new one."
+            case .wrongDirection(let number, let up):
+                return "The change of \(number) went \(up ? "up" : "down"), but the text said it went \(up ? "down" : "up")."
+            }
+        }
+    }
+
     /// True when every number in `text` is one of these facts' figures, and the text
     /// doesn't speak as "we", name the wrong time period, or work out amounts in words.
     static func quotesOnlyFigures(of facts: [Fact], in text: String) -> Bool {
-        quotesOnly(allowedNumbers(facts), period: facts.first?.period,
-                   showsHalving: facts.contains { $0.changed(.down, by: "50%") },
-                   showsDoubling: facts.contains { $0.changed(.up, by: "100%") },
-                   in: text)
+        problem(quoting: facts, in: text) == nil
+    }
+
+    /// Why `quotesOnlyFigures` would say false, or nil when it says true.
+    static func problem(quoting facts: [Fact], in text: String) -> Problem? {
+        problem(allowing: allowedNumbers(facts), period: facts.first?.period,
+                showsHalving: facts.contains { $0.changed(.down, by: "50%") },
+                showsDoubling: facts.contains { $0.changed(.up, by: "100%") },
+                in: text)
     }
 
     /// The same check for figures that aren't Facts (the Email summary): `allowed` is every
@@ -23,38 +86,57 @@ nonisolated enum FigureCheck {
     /// "twice" only with `showsDoubling`.
     static func quotesOnly(_ allowed: Set<Decimal>, period: Fact.Period?,
                            showsHalving: Bool, showsDoubling: Bool, in text: String) -> Bool {
+        problem(allowing: allowed, period: period, showsHalving: showsHalving,
+                showsDoubling: showsDoubling, in: text) == nil
+    }
+
+    /// Why `quotesOnly` would say false (the first problem in the text), or nil.
+    static func problem(allowing allowed: Set<Decimal>, period: Fact.Period?,
+                        showsHalving: Bool, showsDoubling: Bool, in text: String) -> Problem? {
         // Words and digit runs, in order: "fifty percent" → ["fifty", "percent"].
         let tokens = text.lowercased().replacingOccurrences(of: "’", with: "'")
             .split { !$0.isLetter && !$0.isNumber && $0 != "'" }
             .map(String.init)
-        let words = Set(tokens)
         // "yesterday" and "month" are the right words only for their own period, and
         // "this month" never is: the month the figures cover is over.
-        var banned = bannedWords
-        if period == .yesterday { banned.remove("yesterday") }
-        if period != .lastMonth { banned.formUnion(["month", "months", "month's", "monthly"]) }
-        guard words.isDisjoint(with: banned) else { return false }
-        if zip(tokens, tokens.dropFirst()).contains(where: { $0 == "this" && $1 == "month" }) { return false }
-
-        // "half" and "doubled" are figures too: fine only when the app shows that change.
-        if !words.isDisjoint(with: halfWords), !showsHalving { return false }
-        if !words.isDisjoint(with: doubleWords), !showsDoubling { return false }
-        // "percent" only right after a number ("fifty percent", "50 percent"), never "a few percent".
-        for (index, token) in tokens.enumerated() where token == "percent" || token == "percentage" {
-            guard index > 0 else { return false }
-            let before = tokens[index - 1]
-            guard before.first?.isNumber == true || spelledNumbers[before] != nil else { return false }
+        var timeWords = self.timeWords
+        if period == .yesterday { timeWords.remove("yesterday") }
+        if period != .lastMonth { timeWords.formUnion(["month", "months", "month's", "monthly"]) }
+        for (index, token) in tokens.enumerated() {
+            if organizationWords.contains(token) { return .speaksAsOrganization(word: token) }
+            if timeWords.contains(token) { return .wrongTimeWords(word: token) }
+            if token == "this", index + 1 < tokens.count, tokens[index + 1] == "month" {
+                return .wrongTimeWords(word: "this month")
+            }
+            if amountWords.contains(token) { return .amountInWords(word: token) }
+            // "half" and "doubled" are figures too: fine only when the app shows that change.
+            if halfWords.contains(token), !showsHalving { return .amountInWords(word: token) }
+            if doubleWords.contains(token), !showsDoubling { return .amountInWords(word: token) }
+            // "percent" only right after a number ("fifty percent", "50 percent"), never "a few percent".
+            if token == "percent" || token == "percentage" {
+                guard index > 0 else { return .percentWithoutNumber }
+                let before = tokens[index - 1]
+                guard before.first?.isNumber == true || spelledNumbers[before] != nil else { return .percentWithoutNumber }
+            }
         }
 
         // "nine" is fine when 9 is one of the figures. "one" is left alone: it's mostly not a figure.
         let spelled = tokens.compactMap { spelledNumbers[$0] }
-        return Set(numbers(in: text) + spelled).isSubset(of: allowed)
+        if let unknown = (numbers(in: text) + spelled).first(where: { !allowed.contains($0) }) {
+            return .unknownFigure(unknown)
+        }
+        return nil
     }
 
     /// False when the text says something "rose 13%" that fell 13%, or the other way
     /// round. It looks at the part of the sentence around each change ("…, though clicks
     /// slipped 0.4 pts to 4.9%") for a word that points the wrong way.
     static func agreesOnDirections(_ text: String, changes: [FactChange]) -> Bool {
+        directionProblem(text, changes: changes) == nil
+    }
+
+    /// Why `agreesOnDirections` would say false, or nil.
+    static func directionProblem(_ text: String, changes: [FactChange]) -> Problem? {
         let parts = text.lowercased()
             .split(separator: /[.,;:!?]\s+|\s+(?:and|but|though|although|while|whereas|yet)\s+/)
             .map(String.init)
@@ -69,10 +151,12 @@ nonisolated enum FigureCheck {
                 let words = Set(part.split { !$0.isLetter }.map(String.init))
                 let right = move.isUp ? upWords : downWords
                 let wrong = move.isUp ? downWords : upWords
-                if !words.isDisjoint(with: wrong), words.isDisjoint(with: right) { return false }
+                if !words.isDisjoint(with: wrong), words.isDisjoint(with: right) {
+                    return .wrongDirection(figure: move.number, actuallyUp: move.isUp)
+                }
             }
         }
-        return true
+        return nil
     }
 
     private static let upWords: Set<String> = [
@@ -104,12 +188,16 @@ nonisolated enum FigureCheck {
         }
     }
 
-    private static let bannedWords: Set<String> = [
-        // Speaking as the organization.
+    /// Speaking as the organization.
+    private static let organizationWords: Set<String> = [
         "we", "we're", "we've", "we'll", "us", "our", "ours", "let's",
-        // The figures cover the chosen period, never today or a calendar week.
+    ]
+    /// The figures cover the chosen period, never today or a calendar week.
+    private static let timeWords: Set<String> = [
         "today", "yesterday", "tonight", "week", "weeks", "week's", "weekly",
-        // Amounts in words the check can't match to a figure.
+    ]
+    /// Amounts in words the check can't match to a figure.
+    private static let amountWords: Set<String> = [
         "triple", "tripled", "third", "thirds", "quarter", "quarters",
         "hundred", "hundreds", "thousand", "thousands", "million", "millions", "dozen", "dozens",
     ]
